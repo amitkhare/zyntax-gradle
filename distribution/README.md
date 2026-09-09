@@ -71,6 +71,14 @@ and preserves upstream's qualified version in ZIP names/root folders. Runtime
 identity uses the supported `versionQualifier=android-1` and recorded `buildTimestamp`
 inputs. This is not a stock 8.14.3 ZIP with replaced libraries or an OS spoof.
 
+Default watching includes F2FS and resolves support at the nearest mounted file
+system. Supported nested mounts remain eligible beneath unsupported ancestors;
+unsupported or remote nested mounts do not inherit support. Ambiguous mount points
+exclude their whole subtree without disabling unrelated locations. Mount changes
+invalidate affected snapshots through the existing watcher lifecycle. Cleanup
+retains original supported snapshots, not complete hashes of filtered directories,
+and discards metadata that cannot be trusted. No application paths are hardcoded.
+
 Native component notices, exact source patch, base revision, build inputs and
 component hash manifest accompany the distribution through its source packaging
 specification. The upstream commit identifies the base, not unmodified Gradle.
@@ -79,22 +87,27 @@ bundled system library. Combined native-component device probes passed, includin
 real Jansi PTY/termios operations.
 
 The 2026-09-09 source build produced
-`gradle-8.14.3-android-1-20260909053352+0000-bin.zip` (137,589,545 bytes), SHA-256
-`0e38a1e17fdab4d64eeab6c7f7c0088aef60551a45cce3bdef13c1e7ef229da4`.
+`gradle-8.14.3-android-1-20260909081124+0000-bin.zip` (137,611,046 bytes), SHA-256
+`8d36a689a31f571b04af9518e132ee5147f56920dd0d90a5e476e8f9b8abcc87`.
 `verify.py` checked its qualified root/runtime receipt, all three exact component
 JARs with no extra native variants, and every packaged notice/provenance file.
 It emits `verification.json` with the exact version, ZIP name, size and hash.
+The source build passed in 10m 2s, including 40 focused mount-policy, detector,
+VFS and snapshot-retention cases. The source patch SHA-256 is
+`e57f5c288fef371c8210f7e65367fb3c74ee1c53185da5fdf7a69e0be88a3b47`.
 The corrected Scala compile-only graph also resolved its Zinc/JLine Jansi request
 to the single owned 1.18 module. These checks do not claim reproducible ZIP bytes
 across fresh build paths.
 
 The unchanged verified ZIP passed the focused USB integration check on 2026-09-09
-(63.359 seconds; private log `run-3513402018586241341/output.log`). It exercised
+(68.531 seconds; private log `run-7096449322066847556/output.log`). It exercised
 the selected client's native core/curses under a real PTY, daemon native process
-and file-metadata services, and ordinary worker JNI in both builds. With explicit
-`--watch-fs`, the same daemon retained snapshots and observed filesystem events
-and input invalidation across two builds on F2FS, then stopped normally.
-Default F2FS support is not enabled or verified; this was an explicit diagnostic.
+and file-metadata services, and ordinary worker JNI in both builds. In evaluated
+`WatchMode.DEFAULT`, with no `--watch-fs` flag, the same daemon retained unchanged
+snapshots and invalidated changed inputs across two builds on F2FS. The unchanged
+task remained up-to-date and the changed output updated. This exercised the real
+nested Android mount table, including unrelated duplicate mounts. The isolated
+test daemon stopped normally; user projects, settings and daemons were untouched.
 Gradle's Jansi runtime-wrapper invocation remains unverified. The result covers
 this qualified distribution and exercised services, not arbitrary Gradle releases
 or all native features. Publication remains separate.
