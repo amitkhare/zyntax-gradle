@@ -1,0 +1,13 @@
+diff --git a/src/main/java/org/gradle/fileevents/FileEvents.java b/src/main/java/org/gradle/fileevents/FileEvents.java
+--- a/src/main/java/org/gradle/fileevents/FileEvents.java
++++ b/src/main/java/org/gradle/fileevents/FileEvents.java
+@@ -93,6 +93,9 @@
+ 
+     private static String getPlatformName(Platform platform) {
+         switch (platform.getId()) {
++            // Android source port: consume the native-platform target identity.
++            case "android-aarch64":
++                return "aarch64-linux-android";
+             case "windows-i386":
+                 return "i386-windows-gnu";
+             case "windows-amd64":

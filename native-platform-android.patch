@@ -1,0 +1,87 @@
+diff --git a/native-platform/src/main/cpp/posix.cpp b/native-platform/src/main/cpp/posix.cpp
+--- a/native-platform/src/main/cpp/posix.cpp
++++ b/native-platform/src/main/cpp/posix.cpp
+@@ -35,7 +35,10 @@
+ #include <sys/utsname.h>
+ #include <termios.h>
+ #include <unistd.h>
++// Android host port: only the Apple implementation below uses sysctl.
++#ifdef __APPLE__
+ #include <sys/sysctl.h>
++#endif
+ 
+ jmethodID fileStatDetailsMethodId;
+ 
+diff --git a/native-platform/src/shared/cpp/generic_posix.cpp b/native-platform/src/shared/cpp/generic_posix.cpp
+--- a/native-platform/src/shared/cpp/generic_posix.cpp
++++ b/native-platform/src/shared/cpp/generic_posix.cpp
+@@ -26,7 +26,8 @@
+ 
+ void mark_failed_with_errno(JNIEnv* env, const char* message, jobject result) {
+     char* buffer = (char*) malloc(1024);
+-#if defined(__linux__) && _GNU_SOURCE
++// Android host port: Bionic implements POSIX strerror_r, not the GNU variant.
++#if defined(__GLIBC__) && _GNU_SOURCE
+     // GNU semantics
+     char* errno_message = strerror_r(errno, buffer, 1024);
+ #else
+diff --git a/native-platform/src/main/java/net/rubygrapefruit/platform/internal/Platform.java b/native-platform/src/main/java/net/rubygrapefruit/platform/internal/Platform.java
+--- a/native-platform/src/main/java/net/rubygrapefruit/platform/internal/Platform.java
++++ b/native-platform/src/main/java/net/rubygrapefruit/platform/internal/Platform.java
+@@ -48,39 +48,11 @@
+                 String osName = getOperatingSystem().toLowerCase();
+                 String arch = getArchitecture();
+-                if (osName.contains("windows")) {
+-                    if (arch.equals("x86")) {
+-                        platform = new Window32Bit();
+-                    } else if (arch.equals("amd64")) {
+-                        platform = new Window64Bit();
+-                    } else if (arch.equals("aarch64")) {
+-                        platform = new WindowAarch64();
+-                    }
+-                } else if (osName.contains("linux")) {
+-                    if (arch.equals("amd64") || arch.equals("x86_64")) {
+-                        platform = new Linux64Bit();
+-                    } else if (arch.equals("i386") || arch.equals("x86")) {
+-                        platform = new Linux32Bit();
+-                    } else if (arch.equals("aarch64")) {
+-                        platform = new LinuxAarch64();
+-                    }
+-                } else if (osName.contains("os x") || osName.contains("darwin")) {
+-                    if (arch.equals("i386")) {
+-                        platform = new MacOs32Bit();
+-                    } else if (arch.equals("x86_64") || arch.equals("amd64") || arch.equals("universal")) {
+-                        platform = new MacOs64Bit();
+-                    } else if (arch.equals("aarch64")) {
+-                        platform = new MacOsAarch64();
+-                    }
+-                } else if (osName.contains("freebsd")) {
+-                    if (arch.equals("amd64")) {
+-                        platform = new FreeBSD64Bit();
+-                    } else if (arch.equals("i386") || arch.equals("x86")) {
+-                        platform = new FreeBSD32Bit();
+-                    }
+-                }
+-                if (platform == null) {
+-                    platform = new Unsupported();
+-                }
++                // Android-only Java companion: target is declared by the component build.
++                if (!osName.equals("linux") || !arch.equals("aarch64")) {
++                    throw new NativeIntegrationUnavailableException(
++                        "This Android aarch64 component requires a Linux/aarch64 JVM.");
++                }
++                platform = new AndroidAarch64();
+             }
+             return platform;
+         }
+@@ -302,8 +274,8 @@
+-    private static class LinuxAarch64 extends Linux {
++    private static class AndroidAarch64 extends Linux {
+         @Override
+         public String getId() {
+-            return "linux-aarch64";
++            return "android-aarch64";
+         }
+     }
+ 
+     private abstract static class FreeBSD extends Unix {
