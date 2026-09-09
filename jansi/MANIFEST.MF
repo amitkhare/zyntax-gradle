@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Implementation-Title: Jansi Android aarch64 source build
+Implementation-Version: 1.18-zyntax.1
+Implementation-Vendor: Zyntax
+Automatic-Module-Name: org.fusesource.jansi
+Main-Class: org.fusesource.jansi.AnsiMain
+

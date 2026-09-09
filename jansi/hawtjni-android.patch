@@ -1,0 +1,311 @@
+diff --git a/hawtjni-runtime/src/main/java/org/fusesource/hawtjni/runtime/Library.java b/hawtjni-runtime/src/main/java/org/fusesource/hawtjni/runtime/Library.java
+--- a/hawtjni-runtime/src/main/java/org/fusesource/hawtjni/runtime/Library.java
++++ b/hawtjni-runtime/src/main/java/org/fusesource/hawtjni/runtime/Library.java
+@@ -15,70 +15,18 @@
+ import java.security.MessageDigest;
+ import java.security.NoSuchAlgorithmException;
+ import java.util.ArrayList;
+-import java.util.Arrays;
+-import java.util.Set;
++import java.nio.file.Files;
++import java.nio.file.attribute.PosixFilePermissions;
+ 
+ /**
+- * Used to find and load a JNI library, eventually after having extracted it.
+- *
+- * It will search for the library in order at the following locations:
+- * <ol>
+- * <li> in the custom library path: If the "<code>library.${name}.path</code>" System property is set to a directory,
+- * subdirectories are searched:
+- *   <ol>
+- *   <li> "<code>${platform}/${arch}</code>"
+- *   <li> "<code>${platform}</code>"
+- *   <li> "<code>${os}</code>"
+- *   <li> "<code></code>"
+- *   </ol>
+- *   for 2 namings of the library:
+- *   <ol>
+- *   <li> as "<code>${name}-${version}</code>" library name if the version can be determined.
+- *   <li> as "<code>${name}</code>" library name
+- *   </ol>
+- * <li> system library path: This is where the JVM looks for JNI libraries by default.
+- *   <ol>
+- *   <li> as "<code>${name}${bit-model}-${version}</code>" library name if the version can be determined.
+- *   <li> as "<code>${name}-${version}</code>" library name if the version can be determined.
+- *   <li> as "<code>${name}</code>" library name
+- *   </ol>
+- * <li> classpath path: If the JNI library can be found on the classpath, it will get extracted
+- * and then loaded. This way you can embed your JNI libraries into your packaged JAR files.
+- * They are looked up as resources in this order:
+- *   <ol>
+- *   <li> "<code>META-INF/native/${platform}/${arch}/${library[-version]}</code>": Store your library here if you want to embed
+- *   more than one platform JNI library on different processor archs in the jar.
+- *   <li> "<code>META-INF/native/${platform}/${library[-version]}</code>": Store your library here if you want to embed more
+- *   than one platform JNI library in the jar.
+- *   <li> "<code>META-INF/native/${os}/${library[-version]}</code>": Store your library here if you want to embed more
+- *   than one platform JNI library in the jar but don't want to take bit model into account.
+- *   <li> "<code>META-INF/native/${library[-version]}</code>": Store your library here if your JAR is only going to embedding one
+- *   platform library.
+- *   </ol>
+- * The file extraction is attempted until it succeeds in the following directories.
+- *   <ol>
+- *   <li> The directory pointed to by the "<code>library.${name}.path</code>" System property (if set)
+- *   <li> a temporary directory (uses the "<code>java.io.tmpdir</code>" System property)
+- *   </ol>
+- * </ol>
++ * Android aarch64 source port of the HawtJNI 1.17 library loader.
+  *
+- * where:
+- * <ul>
+- * <li>"<code>${name}</code>" is the name of library
+- * <li>"<code>${version}</code>" is the value of "<code>library.${name}.version</code>" System property if set.
+- *       Otherwise it is set to the ImplementationVersion property of the JAR's Manifest</li>
+- * <li>"<code>${os}</code>" is your operating system, for example "<code>osx</code>", "<code>linux</code>", or "<code>windows</code>"</li>
+- * <li>"<code>${bit-model}</code>" is "<code>64</code>" if the JVM process is a 64 bit process, otherwise it's "<code>32</code>" if the
+- * JVM is a 32 bit process</li>
+- * <li>"<code>${arch}</code>" is the architecture for the processor, for example "<code>amd64</code>" or "<code>sparcv9</code>"</li>
+- * <li>"<code>${platform}</code>" is "<code>${os}${bit-model}</code>", for example "<code>linux32</code>" or "<code>osx64</code>" </li>
+- * <li>"<code>${library[-version]}</code>": is the normal jni library name for the platform (eventually with <code>-${version}</code>) suffix.
+- *   For example "<code>${name}.dll</code>" on
+- *   windows, "<code>lib${name}.jnilib</code>" on OS X, and "<code>lib${name}.so</code>" on linux</li>
+- * </ul>
++ * The target is declared by this component build; JVM properties are validated,
++ * never changed. An explicit library.${name}.path is authoritative. Otherwise
++ * only the matching Android resource is extracted to java.io.tmpdir using the
++ * upstream extraction strategy. No system-library or other-platform search occurs.
+  *
+  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+- * @see System#mapLibraryName(String)
+  */
+ public class Library {
+ 
+@@ -161,7 +109,13 @@
+     }
+ 
+     public static String getPlatform() {
+-        return getOperatingSystem()+getBitModel();
++        // Android-only build identity, not a claim to detect Bionic on other JVMs.
++        if (!"linux".equals(getOperatingSystem())
++                || !"aarch64".equals(System.getProperty("os.arch"))
++                || getBitModel() != 64) {
++            throw new UnsatisfiedLinkError("This Jansi component targets Android aarch64 and requires a Linux/aarch64 64-bit JVM.");
++        }
++        return "android-aarch64";
+     }
+ 
+     public static int getBitModel() {
+@@ -187,46 +141,30 @@
+     }
+ 
+     private void doLoad() {
+-        /* Perhaps a custom version is specified */
++        String platform = getPlatform();
+         String version = System.getProperty("library."+name+".version");
+         if (version == null) {
+             version = this.version;
+         }
+         ArrayList<Throwable> errors = new ArrayList<Throwable>();
+-
+-        String[] specificDirs = getSpecificSearchDirs();
+         String libFilename = map(name);
+-        String versionlibFilename = (version == null) ? null : map(name + "-" + version);
+-
+-        /* Try loading library from a custom library path */
+         String customPath = System.getProperty("library."+name+".path");
++
++        // Gradle supplies the exact parent of its extracted Android resource.
++        // A supplied path must succeed; never fall through to another library.
+         if (customPath != null) {
+-            for ( String dir: specificDirs ) {
+-                if( version!=null && load(errors, file(customPath, dir, versionlibFilename)) )
+-                    return;
+-                if( load(errors, file(customPath, dir, libFilename)) )
+-                    return;
++            File directory = new File(customPath);
++            if (!directory.isAbsolute()) {
++                throw new UnsatisfiedLinkError("An absolute native library directory is required: " + customPath);
+             }
+-        }
+-
+-        /* Try loading library from java library path */
+-        if( version!=null && loadLibrary(errors, name + getBitModel() + "-" + version) )
+-            return;
+-        if( version!=null && loadLibrary(errors, name + "-" + version) )
+-            return;
+-        if( loadLibrary(errors, name) )
+-            return;
+-
+-
+-        /* Try extracting the library from the jar */
+-        if( classLoader!=null ) {
+-            String targetLibName = version != null ? versionlibFilename : libFilename;
+-            for ( String dir: specificDirs ) {
+-                if( version!=null && extractAndLoad(errors, customPath, dir, versionlibFilename, targetLibName) )
+-                    return;
+-                if( extractAndLoad(errors, customPath, dir, libFilename, targetLibName) )
+-                    return;
++            if (load(errors, new File(directory, libFilename))) {
++                return;
+             }
++        } else if (classLoader != null) {
++            String targetLibName = version == null ? libFilename : map(name + "-" + version);
++            if (extractAndLoad(errors, platform, libFilename, targetLibName)) {
++                return;
++            }
+         }
+ 
+         /* Failed to find the library */
+@@ -283,58 +221,29 @@
+         return map(name);
+     }
+ 
+-    /**
+-     * Search directories for library:<ul>
+-     * <li><code>${platform}/${arch}</code> to enable platform JNI library for different processor archs</li>
+-     * <li><code>${platform}</code> to enable platform JNI library</li>
+-     * <li><code>${os}</code> to enable OS JNI library</li>
+-     * <li>no directory</li>
+-     * </ul>
+-     * @return the list
+-     * @since 1.15
+-     */
++    /** The sole resource namespace embedded by this Android-only assembly. */
+     final public String[] getSpecificSearchDirs() {
+-        return new String[] {
+-                getPlatform() + "/" + System.getProperty("os.arch"),
+-                getPlatform(),
+-                getOperatingSystem(),
+-                "."
+-        };
++        return new String[] { getPlatform() };
+     }
+ 
+-    private boolean extractAndLoad(ArrayList<Throwable> errors, String customPath, String dir, String libName, String targetLibName) {
+-        String resourcePath = "META-INF/native/" + ( dir == null ? "" : (dir + '/')) + libName;
++    private boolean extractAndLoad(ArrayList<Throwable> errors, String dir, String libName, String targetLibName) {
++        String resourcePath = "META-INF/native/" + dir + '/' + libName;
+         URL resource = classLoader.getResource(resourcePath);
+-        if( resource !=null ) {
+-
+-            int idx = targetLibName.lastIndexOf('.');
+-            String prefix = targetLibName.substring(0, idx)+"-";
+-            String suffix = targetLibName.substring(idx);
+-
+-            // Use the user provided path,
+-            // then fallback to the java temp directory,
+-            // and last, use the user home folder
+-            for (File path : Arrays.asList(
+-                                    customPath != null ? file(customPath) : null,
+-                                    file(System.getProperty("java.io.tmpdir")),
+-                                    file(System.getProperty("user.home"), ".hawtjni", name))) {
+-                if( path!=null ) {
+-                    // Try to extract it to the custom path...
+-                    File target;
+-                    if (STRATEGY_SHA1.equals(STRATEGY)) {
+-                        target = extractSha1(errors, resource, prefix, suffix, path);
+-                    } else {
+-                        target = extractTemp(errors, resource, prefix, suffix, path);
+-                    }
+-                    if( target!=null ) {
+-                        if( load(errors, target) ) {
+-                            nativeLibrarySourceUrl = resource;
+-                            return true;
+-                        }
+-                    }
+-                }
+-            }
++        if (resource == null) {
++            errors.add(new FileNotFoundException(resourcePath));
++            return false;
+         }
++        int idx = targetLibName.lastIndexOf('.');
++        String prefix = targetLibName.substring(0, idx) + "-";
++        String suffix = targetLibName.substring(idx);
++        File directory = new File(System.getProperty("java.io.tmpdir"));
++        File target = STRATEGY_SHA1.equals(STRATEGY)
++                ? extractSha1(errors, resource, prefix, suffix, directory)
++                : extractTemp(errors, resource, prefix, suffix, directory);
++        if (target != null && load(errors, target)) {
++            nativeLibrarySourceUrl = resource;
++            return true;
++        }
+         return false;
+     }
+ 
+@@ -490,31 +399,9 @@
+         }
+     }
+ 
+-    private void chmod755(File file) {
+-        if (getPlatform().startsWith("windows"))
+-            return;
+-        // Use Files.setPosixFilePermissions if we are running Java 7+ to avoid forking the JVM for executing chmod
+-        try {
+-            ClassLoader classLoader = getClass().getClassLoader();
+-            // Check if the PosixFilePermissions exists in the JVM, if not this will throw a ClassNotFoundException
+-            Class<?> posixFilePermissionsClass = classLoader.loadClass("java.nio.file.attribute.PosixFilePermissions");
+-            // Set <PosixFilePermission> permissionSet = PosixFilePermissions.fromString("rwxr-xr-x")
+-            Method fromStringMethod = posixFilePermissionsClass.getMethod("fromString", String.class);
+-            Object permissionSet = fromStringMethod.invoke(null, "rwxr-xr-x");
+-            // Path path = file.toPath()
+-            Object path = file.getClass().getMethod("toPath").invoke(file);
+-            // Files.setPosixFilePermissions(path, permissionSet)
+-            Class<?> pathClass = classLoader.loadClass("java.nio.file.Path");
+-            Class<?> filesClass = classLoader.loadClass("java.nio.file.Files");
+-            Method setPosixFilePermissionsMethod = filesClass.getMethod("setPosixFilePermissions", pathClass, Set.class);
+-            setPosixFilePermissionsMethod.invoke(null, path, permissionSet);
+-        } catch (Throwable ignored) {
+-            // Fallback to starting a new process
+-            try {
+-                Runtime.getRuntime().exec(new String[]{"chmod", "755", file.getCanonicalPath()}).waitFor();
+-            } catch (Throwable e) {
+-            }
+-        }
++    private void chmod755(File file) throws IOException {
++        // This Java 8+ component never spawns a chmod process.
++        Files.setPosixFilePermissions(file.toPath(), PosixFilePermissions.fromString("rwxr-xr-x"));
+     }
+ 
+     private boolean load(ArrayList<Throwable> errors, File lib) {
+@@ -530,17 +417,4 @@
+         return false;
+     }
+ 
+-    private boolean loadLibrary(ArrayList<Throwable> errors, String lib) {
+-        try {
+-            System.loadLibrary(lib);
+-            nativeLibraryPath = "java.library.path,sun.boot.library.pathlib:" + lib;
+-            return true;
+-        } catch (UnsatisfiedLinkError e) {
+-            LinkageError le = new LinkageError("Unable to load library " + lib);
+-            le.initCause(e);
+-            errors.add(le);
+-        }
+-        return false;
+-    }
+-
+ }
+--- a/hawtjni-generator/src/main/resources/hawtjni.c
++++ b/hawtjni-generator/src/main/resources/hawtjni.c
+@@ -40,7 +40,7 @@
+     if( JNI_ATTACH_THREAD_LOCAL_KEY ) {
+       *env = pthread_getspecific(JNI_ATTACH_THREAD_LOCAL_KEY);
+       if( ! *env ) {
+-        if( (*JVM)->AttachCurrentThread(JVM, (void**)env, &args)==0 ) {
++        if( (*JVM)->AttachCurrentThread(JVM, env, &args)==0 ) {
+           pthread_setspecific(JNI_ATTACH_THREAD_LOCAL_KEY, *env);
+         } else {
+           return -1;
+@@ -48,10 +48,10 @@
+       }
+       return 0;
+     } else {
+-      return (*JVM)->AttachCurrentThread(JVM, (void**)env, &args);
++      return (*JVM)->AttachCurrentThread(JVM, env, &args);
+     }
+   #else
+-    return (*JVM)->AttachCurrentThread(JVM, (void**)env, &args);
++    return (*JVM)->AttachCurrentThread(JVM, env, &args);
+   #endif
+ }
+ 

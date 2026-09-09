@@ -1,0 +1,29 @@
+diff --git a/src/main/java/org/fusesource/jansi/internal/CLibrary.java b/src/main/java/org/fusesource/jansi/internal/CLibrary.java
+--- a/src/main/java/org/fusesource/jansi/internal/CLibrary.java
++++ b/src/main/java/org/fusesource/jansi/internal/CLibrary.java
+@@ -16,6 +16,8 @@
+ package org.fusesource.jansi.internal;
+ 
+ import static org.fusesource.hawtjni.runtime.FieldFlag.CONSTANT;
++import static org.fusesource.hawtjni.runtime.FieldFlag.GETTER_NONMEMBER;
++import static org.fusesource.hawtjni.runtime.FieldFlag.SETTER_NONMEMBER;
+ import static org.fusesource.hawtjni.runtime.MethodFlag.CONSTANT_INITIALIZER;
+ 
+ import static org.fusesource.hawtjni.runtime.ArgFlag.*;
+@@ -218,10 +220,14 @@
+         public long c_cflag;
+         @JniField(accessor="c_lflag")
+         public long c_lflag;
++        // Android Bionic has a line-discipline byte and encodes speeds in flags.
++        // Preserve the complete target termios state using its public POSIX accessors.
++        @JniField(accessor="c_line")
++        public byte c_line;
+         @JniField(accessor="c_cc")
+         public byte[] c_cc = new byte[32];
+-        @JniField(accessor="c_ispeed")
++        @JniField(getter="cfgetispeed()", setter="cfsetispeed()", flags={GETTER_NONMEMBER, SETTER_NONMEMBER})
+         public long c_ispeed;
+-        @JniField(accessor="c_ospeed")
++        @JniField(getter="cfgetospeed()", setter="cfsetospeed()", flags={GETTER_NONMEMBER, SETTER_NONMEMBER})
+         public long c_ospeed;
+     }
