@@ -189,7 +189,7 @@ def main():
     (provenance / "SOURCE-BUILD.properties").write_bytes((
         "upstreamRevision=e5ee1df3d88b8ca3a8074787a94f373e3090e1db\n"
         f"sourcePatchSha256={hashlib.sha256(patch).hexdigest()}\n"
-        "sourceModified=true\nrecipe=gradle/distribution/build.sh\n"
+        "sourceModified=true\nrecipe=distribution/build.sh\n"
         "task=:distributions-full:binDistributionZip\nversionQualifier=android-1\n"
         f"buildTimestamp={(stage / 'build-timestamp').read_text().strip()}\n"
         "wrapperVersion=8.14.2\n"

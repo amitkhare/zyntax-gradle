@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 stage=${1:?fresh Jansi build directory required}
-ndk_dir=${NDK_DIR:-/work/ndk/android-ndk-r29}
+ndk_dir=${NDK_DIR:?Supply the external official r29 NDK directory}
 tools="$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin"
 library="$stage/artifacts/lib/libjansi.so"
 jar_file="$stage/artifacts/java/jansi-1.18-zyntax.1.jar"

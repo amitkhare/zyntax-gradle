@@ -2,11 +2,10 @@
 set -euo pipefail
 
 recipe_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_dir="$(cd "$recipe_dir/../.." && pwd)"
 revision=e5ee1df3d88b8ca3a8074787a94f373e3090e1db
 wrapper_sha256=7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999
 work_dir=${WORK_DIR:-/work/gradle-native/distribution/8.14.3-android.1}
-source_input=${SOURCE_INPUT:-$repo_dir/.work/gradle-native/gradle}
+source_input=${SOURCE_INPUT:-/work/gradle-native/gradle}
 mode=${1:-build}
 [[ $mode == prepare || $mode == build ]]
 [[ $work_dir == /work/gradle-native/distribution/* && $work_dir != */../* ]]

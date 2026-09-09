@@ -4,7 +4,7 @@ set -euo pipefail
 recipe_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 work_dir=${WORK_DIR:-/work/gradle-native/jansi}
 source_dir=${SOURCE_DIR:-$work_dir}
-ndk_dir=${NDK_DIR:-/work/ndk/android-ndk-r29}
+ndk_dir=${NDK_DIR:?Supply the external official r29 NDK directory}
 build_jobs=${BUILD_JOBS:-2}
 export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}
 export PATH="$JAVA_HOME/bin:$PATH"

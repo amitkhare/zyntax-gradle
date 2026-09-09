@@ -2,7 +2,7 @@
 set -euo pipefail
 
 stage=${1:?Usage: verify-native.sh build-stage}
-ndk_dir=${NDK_DIR:-/work/ndk/android-ndk-r29}
+ndk_dir=${NDK_DIR:?Supply the external official r29 NDK directory}
 tools="$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
 verify_library() {

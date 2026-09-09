@@ -1,0 +1,24 @@
+# Downloaded sources, build trees and generated distributions.
+/.work/
+/dist/
+/build/
+*.deb
+*.tar.*
+*.zip
+*.log
+
+# Local configuration and secrets never belong in this public repository.
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.pem
+.secrets/
+.idea/
+.vscode/
+__pycache__/
+*.pyc

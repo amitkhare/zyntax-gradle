@@ -1,29 +1,42 @@
-# Android-host Gradle native components
+# Zyntax Gradle for Android
 
-Source ports of the native-platform and file-events components used by Gradle 8.14.3. These component recipes do not modify a Wrapper, installed Gradle, or its native extraction cache. The standalone Android core and terminal probes passed. The separate [source-built distribution](distribution/README.md) records its verified native integration and remaining default-F2FS limitation.
+An optional, Android-aarch64 source port of **Gradle 8.14.3** and its native-platform, file-events and Jansi components. This standalone repository owns only Gradle tooling; it contains no app or extension SDK source and is not a mirror or support promise for all Gradle versions.
 
-## Inputs and build
+Stock Gradle already built the Android samples and the complete Zyntax APK/AABs with the separately adapted Android build tools. Its desktop native libraries could not load on Android. This port restores the exercised native process, filesystem and terminal services, plus default file watching and snapshot retention on F2FS; it does not replace Gradle's build engine or claim that stock Gradle cannot build APKs.
+
+The [source-built distribution](distribution/README.md) records the exact verified ZIP, source changes and remaining limits. [Jansi](jansi/README.md) has separate source and probe evidence. Runtime selection is explicit: these recipes do not modify a project's Wrapper, installed Gradle, native extraction cache or JVM OS properties. The release destination is [amitkhare/zyntax-gradle](https://github.com/amitkhare/zyntax-gradle/releases).
+
+## Repository and release history
+
+The Gradle-only source history was moved out of the former combined toolchain repository. Current recipes live at this repository's root and use an independent Docker volume. The verified 2026-09-09 ZIP was built **before** that move: its embedded provenance and source companions retain their original `gradle/...` recipe paths. Those immutable bytes and hashes are not rewritten to describe the new layout. The relocated recipes have not been rebuilt or device-tested merely by moving them.
+
+See [NOTICE.md](NOTICE.md) for component source and license coverage.
+
+## Native components: inputs and build
 
 | Component | Upstream source | Base version |
 | --- | --- | --- |
 | native-platform | [87f4647e90db6006bf357db0ba7fa29925dcc32e](https://github.com/gradle/native-platform/tree/87f4647e90db6006bf357db0ba7fa29925dcc32e) | 0.22-milestone-28 |
 | file-events | [08be35d81f4d6336ce4666122c0c72a97b11a7e9](https://github.com/gradle/gradle-fileevents/tree/08be35d81f4d6336ce4666122c0c72a97b11a7e9) | 0.2.7 |
 
-Prepare exact Git checkouts at `.work/gradle-native/native-platform` and `.work/gradle-native/file-events`. `build-native.sh` verifies both commits, clones fresh isolated working trees, and applies the checked-in patches. Existing source checkouts remain unchanged.
+Prepare exact Git checkouts at `/work/gradle-native/native-platform` and `/work/gradle-native/file-events` inside the independent `zyntax-gradle-work` volume. `build-native.sh` verifies both commits, clones fresh isolated working trees, and applies the checked-in patches. Existing source checkouts remain unchanged.
 
-With the existing `zyntax-ndk-r29-builder` image and `zyntax-ndk-r29-work` volume prepared by the root toolchain recipe:
+Build the standalone host image from this repository. Supply an externally installed official Linux-host NDK r29 root through `HOST_NDK_R29`; it is mounted read-only at `/ndk`. `NDK_DIR` is required for native build and verification entry points. Neither the NDK source repository, its Docker image nor its work volume is required.
 
 ```bash
-docker build -f gradle/Dockerfile -t zyntax-gradle-native-builder .
+export HOST_NDK_R29=/absolute/path/to/android-ndk-r29
+docker build -t zyntax-gradle-native-builder .
 docker run --rm \
-  -v zyntax-ndk-r29-work:/work \
+  -v zyntax-gradle-work:/work \
   -v "$PWD:/repo:ro" \
-  zyntax-gradle-native-builder /repo/gradle/build-native.sh
+  -v "$HOST_NDK_R29:/ndk:ro" \
+  -e NDK_DIR=/ndk -e SOURCE_DIR=/work/gradle-native \
+  zyntax-gradle-native-builder /repo/build-native.sh
 ```
 
-The builder adds a Linux host JDK 17. Android output uses official NDK r29 (`29.0.14206865`), Clang 21, `arm64-v8a`, API 24, static libc++, and 16 KB ELF segment alignment. The selected NDK's system JNI headers define the target JNI ABI. No glibc shim, binary rewriting, fake GNU library name, or disabled native check is involved.
+The standalone builder supplies Linux host JDK 17, CMake and Ninja. Android output uses the external official NDK r29 (`29.0.14206865`), Clang 21, `arm64-v8a`, API 24, static libc++, and 16 KB ELF segment alignment. The selected NDK's system JNI headers define the target JNI ABI. No glibc shim, binary rewriting, fake GNU library name, or disabled native check is involved.
 
-Upstream wrappers perform only Java/header/version generation: file-events uses Gradle 8.10.2 `compileJava`; native-platform uses Gradle 7.5 `writeNativeVersionSources`, followed by host `javac --release 8 -h` over its complete Java sources. Java 8 bytecode is suitable for Gradle 8.14.3; this does not try to reproduce native-platform's historical Java 5/6 targets. These build-tool distributions/cache are isolated under `/work/gradle-native/gradle-home`. Builds use two workers, a 1536 MB Gradle heap, and `--no-scan` to prevent build-scan upload. Nothing is published.
+Upstream wrappers perform only Java/header/version generation: file-events uses Gradle 8.10.2 `compileJava`; native-platform uses Gradle 7.5 `writeNativeVersionSources`, followed by host `javac --release 8 -h` over its complete Java sources. Java 8 bytecode is suitable for Gradle 8.14.3; this does not try to reproduce native-platform's historical Java 5/6 targets. These build-tool distributions/cache are isolated under `/work/gradle-native/gradle-home`. Builds use two workers, a 1536 MB Gradle heap, and `--no-scan` to prevent build-scan upload. The build recipes do not publish artifacts.
 
 Each build prints its fresh `/work/gradle-native/build-*/` directory. `artifacts/` contains three shared libraries, paired source-built Java component JARs with their own Android native resources, Java source JARs, generated version headers, notices, and a dedicated probe bundle. Keeping resources in each component JAR also supports Gradle's isolated test-worker classloader. Those JARs are component outputs, not replacements to copy into stock Gradle.
 
@@ -39,9 +52,9 @@ net/rubygrapefruit/platform/android-aarch64/libnative-platform-curses.so
 net/rubygrapefruit/platform/aarch64-linux-android/libgradle-fileevents.so
 ```
 
-Upstream extraction, loading and version checks remain intact. Native-platform's `NativeVersion` is a native-source/build-tool fingerprint, not its Maven version. The upstream generator produces both its C header and Java constant; all Java sources are rebuilt because the constant is inlined in callers. No prebuilt fingerprint is copied over changed sources. File-events likewise uses its upstream version generator for both sides. The probe bundle is intentionally Android-only; publishing a universal Java component or choosing a Gradle distribution remains separate work.
+Upstream extraction, loading and version checks remain intact. Native-platform's `NativeVersion` is a native-source/build-tool fingerprint, not its Maven version. The upstream generator produces both its C header and Java constant; all Java sources are rebuilt because the constant is inlined in callers. No prebuilt fingerprint is copied over changed sources. File-events likewise uses its upstream version generator for both sides. The probe bundle is intentionally Android-only; the qualified distribution uses these same paired components rather than universal Java companions.
 
-The curses component is also source-built for `android-aarch64`, using the official Android `ncurses` package already checksum-pinned in `sources-debugger.tsv`. Its headers and library are extracted only as build inputs; the package is not modified or bundled. The resulting JNI library depends on the package's genuine `libncursesw.so.6` SONAME. Install `ncurses` in the same app-private terminal runtime and supply its terminfo directory through `TERMINFO` (normally `$PREFIX/share/terminfo`). This is an explicit terminal-package dependency, not a standalone managed-runtime bundle. No GNU ncurses5/6 candidate names or desktop terminfo paths are used by the Android selector. This work does not claim all Gradle native features or arbitrary Gradle releases are Android-compatible.
+The curses component is also source-built for `android-aarch64`, using the official Android `ncurses` package checksum-pinned in [ncurses-input.tsv](ncurses-input.tsv). Its headers and library are extracted only as build inputs; the package is not modified or bundled. The resulting JNI library depends on the package's genuine `libncursesw.so.6` SONAME. Install `ncurses` in the same app-private terminal runtime and supply its terminfo directory through `TERMINFO` (normally `$PREFIX/share/terminfo`). This is an explicit terminal-package dependency, not a standalone managed-runtime bundle. No GNU ncurses5/6 candidate names or desktop terminfo paths are used by the Android selector. This work does not claim all Gradle native features or arbitrary Gradle releases are Android-compatible.
 
 ## Verification and standalone probe
 

@@ -7,9 +7,11 @@ JNI library; it has no separate Maven runtime dependencies. No stock JAR is edit
 
 ## Build
 
-Use the repository's Linux `zyntax-gradle-native-builder` image (JDK 17, CMake,
-Ninja, Git and curl) and `zyntax-ndk-r29-work` volume. NDK r29 must be installed at
-`/work/ndk/android-ndk-r29`, revision `29.0.14206865`.
+Use the standalone repository-root `zyntax-gradle-native-builder` image (JDK 17,
+CMake, Ninja, Git and curl) and independent `zyntax-gradle-work` volume. Supply
+an externally installed official Linux-host NDK r29 root, revision
+`29.0.14206865`, mounted read-only at `/ndk` with `NDK_DIR=/ndk`. No NDK repository,
+base image or shared NDK work volume is required.
 
 Prepare the three upstream checkouts once, inside that volume:
 
@@ -24,14 +26,17 @@ git clone --branch hawtjni-project-1.17 --depth 1 https://github.com/fusesource/
 The build validates each exact commit in `SOURCE-PROVENANCE.properties`, creates
 a fresh isolated source/build directory, applies the checked-in source patches,
 and verifies the pinned host-only HawtJNI generator's SHA-256. Generator classes
-are not shipped. Run from the repository root in PowerShell:
+are not shipped. Run from the repository root in PowerShell, setting the external
+NDK path explicitly:
 
 ```powershell
-docker run --rm -v zyntax-ndk-r29-work:/work -v "${PWD}:/repo:ro" zyntax-gradle-native-builder /repo/gradle/jansi/build.sh
+$env:HOST_NDK_R29 = 'D:/path/to/android-ndk-r29'
+docker run --rm -v zyntax-gradle-work:/work -v "${PWD}:/repo:ro" -v "${env:HOST_NDK_R29}:/ndk:ro" -e NDK_DIR=/ndk zyntax-gradle-native-builder /repo/jansi/build.sh
 ```
 
-The image already has a Bash entrypoint. `WORK_DIR`, `SOURCE_DIR`, `NDK_DIR`,
-`JAVA_HOME` and `BUILD_JOBS` can be set explicitly; defaults are in `build.sh`.
+The image already has a Bash entrypoint. `NDK_DIR` is mandatory for the build and
+native verification scripts. `WORK_DIR`, `SOURCE_DIR`, `JAVA_HOME` and `BUILD_JOBS`
+can be set explicitly; their defaults are in `build.sh`.
 Keep checkouts and outputs in the volume or the ignored `.work/` directory.
 
 Each successful build prints its fresh `/work/gradle-native/jansi/build-*/artifacts`
@@ -89,6 +94,11 @@ implied by a successful host build, nor does this component alone establish
 complete Gradle compatibility.
 
 ### Verified Android execution
+
+The following result predates the move to this standalone repository. Its
+artifacts, source JAR and hashes remain unchanged; embedded historical recipe
+paths are provenance, not a dependency on the former repository. Relocation alone
+does not establish a new build or device result.
 
 Build `build-SVCXGV` passed the combined USB native-platform/curses/Jansi probe
 (`run-8565402705635806309/output.log`, `OK (1 test)`, 4.154 seconds). The exact

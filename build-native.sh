@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source_dir=${SOURCE_DIR:-$repo_dir/.work/gradle-native}
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 work_dir=${WORK_DIR:-/work/gradle-native}
-ndk_dir=${NDK_DIR:-/work/ndk/android-ndk-r29}
+source_dir=${SOURCE_DIR:-$work_dir}
+ndk_dir=${NDK_DIR:?Supply the external official r29 NDK directory}
 build_jobs=${BUILD_JOBS:-2}
 export GRADLE_USER_HOME="$work_dir/gradle-home"
 export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}
@@ -14,12 +14,23 @@ grep -x 'Pkg.Revision = 29.0.14206865' "$ndk_dir/source.properties" >/dev/null
 mkdir -p "$work_dir"
 stage=$(mktemp -d "$work_dir/build-XXXXXX")
 
-# Reuse the official Android terminal dependency already pinned by this repo.
-ncurses_manifest=$(awk -F '\t' '$1 ~ /^ncurses_/ { print }' "$repo_dir/sources-debugger.tsv")
-[[ $(printf '%s\n' "$ncurses_manifest" | wc -l) == 1 ]]
-bash "$repo_dir/scripts/download-inputs.sh" <(printf '%s\n' "$ncurses_manifest") "${DOWNLOADS_DIR:-/work/downloads}"
+# The official Android terminal dependency is a pinned external build input.
+mapfile -t ncurses_inputs < "$repo_dir/ncurses-input.tsv"
+[[ ${#ncurses_inputs[@]} == 1 ]]
+ncurses_manifest=${ncurses_inputs[0]}
 IFS=$'\t' read -r ncurses_archive ncurses_checksum ncurses_url <<<"$ncurses_manifest"
-dpkg-deb --extract "${DOWNLOADS_DIR:-/work/downloads}/$ncurses_archive" "$stage/ncurses"
+[[ $ncurses_archive != */* && $ncurses_archive != .* && $ncurses_checksum =~ ^[0-9a-f]{64}$ && $ncurses_url == https://* ]]
+downloads_dir=${DOWNLOADS_DIR:-/work/downloads}
+mkdir -p "$downloads_dir"
+ncurses_package="$downloads_dir/$ncurses_archive"
+if [[ ! -f $ncurses_package ]]; then
+    curl --fail --location --proto '=https' --proto-redir '=https' \
+        --retry 2 --output "$ncurses_package.part" "$ncurses_url"
+    printf '%s  %s\n' "$ncurses_checksum" "$ncurses_package.part" | sha256sum --check --status
+    mv "$ncurses_package.part" "$ncurses_package"
+fi
+printf '%s  %s\n' "$ncurses_checksum" "$ncurses_package" | sha256sum --check
+dpkg-deb --extract "$ncurses_package" "$stage/ncurses"
 mapfile -d '' -t ncurses_headers < <(find "$stage/ncurses" -type f -path '*/include/curses.h' -print0)
 [[ ${#ncurses_headers[@]} == 1 ]]
 ncurses_prefix=${ncurses_headers[0]%/include/curses.h}
@@ -32,10 +43,10 @@ prepare_source() {
 }
 prepare_source native-platform 87f4647e90db6006bf357db0ba7fa29925dcc32e
 prepare_source file-events 08be35d81f4d6336ce4666122c0c72a97b11a7e9
-git -C "$stage/native-platform" apply --check "$repo_dir/gradle/native-platform-android.patch"
-git -C "$stage/native-platform" apply "$repo_dir/gradle/native-platform-android.patch"
-git -C "$stage/file-events" apply --check "$repo_dir/gradle/file-events-android.patch"
-git -C "$stage/file-events" apply "$repo_dir/gradle/file-events-android.patch"
+git -C "$stage/native-platform" apply --check "$repo_dir/native-platform-android.patch"
+git -C "$stage/native-platform" apply "$repo_dir/native-platform-android.patch"
+git -C "$stage/file-events" apply --check "$repo_dir/file-events-android.patch"
+git -C "$stage/file-events" apply "$repo_dir/file-events-android.patch"
 
 (
     cd "$stage/file-events"
@@ -58,7 +69,7 @@ jsr305=$(find "$GRADLE_USER_HOME/caches/modules-2/files-2.1/com.google.code.find
 test -n "$jsr305"
 javac --release 8 -cp "$jsr305" -h "$np/build/generated/jni" -d "$np/build/classes/java/main" "${java_sources[@]}"
 
-cmake -S "$repo_dir/gradle" -B "$stage/cmake" -G Ninja \
+cmake -S "$repo_dir" -B "$stage/cmake" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$ndk_dir/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static \
@@ -70,7 +81,7 @@ cmake --install "$stage/cmake"
 mkdir -p "$stage/artifacts/licenses" "$stage/artifacts/java"
 cp "$stage/native-platform/LICENSE" "$stage/artifacts/licenses/native-platform-LICENSE"
 cp "$stage/file-events/LICENSE" "$stage/artifacts/licenses/file-events-LICENSE"
-cp "$repo_dir/gradle/licenses/slf4j-LICENSE.txt" "$stage/artifacts/licenses/"
+cp "$repo_dir/licenses/slf4j-LICENSE.txt" "$stage/artifacts/licenses/"
 cp "$ncurses_prefix/share/doc/ncurses/copyright" "$stage/artifacts/licenses/ncurses-copyright"
 printf '%s\n' "$ncurses_manifest" > "$stage/artifacts/ncurses-input.tsv"
 cp "$ndk_dir/NOTICE" "$stage/artifacts/licenses/ndk-NOTICE"
@@ -91,7 +102,7 @@ jar --create --file "$stage/artifacts/sources/native-platform-sources.jar" \
     -C "$np/src/main/java" . -C "$np/build/generated/version/java" .
 jar --create --file "$stage/artifacts/sources/gradle-fileevents-sources.jar" \
     -C "$stage/file-events/src/main/java" . -C "$stage/file-events/build/generated/sources/java/version" .
-bash "$repo_dir/gradle/verify-native.sh" "$stage"
+bash "$repo_dir/verify-native.sh" "$stage"
 
 # A standalone Android-identified probe bundle, never a modified Gradle runtime.
 probe="$stage/artifacts/probe"
@@ -100,10 +111,10 @@ cp "$stage/artifacts/java/"*.jar "$probe/lib/"
 slf4j=$(find "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.slf4j/slf4j-api/1.7.36" -name '*.jar' -print -quit)
 test -n "$slf4j"
 cp "$slf4j" "$probe/lib/"
-javac --release 8 -cp "$probe/lib/*" -d "$stage/probe-classes" "$repo_dir/gradle/NativeProbe.java"
+javac --release 8 -cp "$probe/lib/*" -d "$stage/probe-classes" "$repo_dir/NativeProbe.java"
 jar --create --file "$probe/lib/native-probe.jar" -C "$stage/probe-classes" .
-cp "$repo_dir/gradle/run-probe.bash" "$probe/"
-cp "$repo_dir/gradle/PORT-NOTICE.txt" "$probe/"
+cp "$repo_dir/run-probe.bash" "$probe/"
+cp "$repo_dir/PORT-NOTICE.txt" "$probe/"
 cp -r "$stage/artifacts/licenses" "$probe/"
 tar -czf "$stage/artifacts/android-native-probe.tar.gz" -C "$probe" .
 printf 'Native artifacts and matched Java sources/classes: %s\n' "$stage"

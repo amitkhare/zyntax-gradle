@@ -8,24 +8,29 @@ scope and remaining limitations are below.
 Nothing here modifies an installed Gradle, its extraction cache, a project's
 wrapper, or app/SDK source.
 
-Use the existing `zyntax-gradle-native-builder` Docker image (Bash entrypoint,
-host JDK 17) and `zyntax-ndk-r29-work` volume. Supply completed, verified component
-artifact directories from the adjacent native and Jansi recipes.
+Build the standalone `zyntax-gradle-native-builder` image from the repository-root
+Dockerfile (Bash entrypoint, host JDK 17) and use the independent
+`zyntax-gradle-work` volume. Supply completed, verified component artifact
+directories from the root native recipe and `jansi/build.sh`. Those component
+builds consume an externally supplied NDK r29; distribution assembly does not
+require an NDK repository, image or filesystem.
 
 Prepare the exact [upstream Gradle Git revision](https://github.com/gradle/gradle/tree/e5ee1df3d88b8ca3a8074787a94f373e3090e1db)
-at `.work/gradle-native/gradle`; its Git objects and HEAD are the source input.
-`SOURCE_INPUT` can name another exact checkout inside the container.
+at `/work/gradle-native/gradle` inside that volume; its Git objects and HEAD are
+the source input. `SOURCE_INPUT` explicitly selects this exact checkout.
+Set `NATIVE_ARTIFACTS` and `JANSI_ARTIFACTS` to the artifact directories printed
+by your completed component builds, not historical build-directory names.
 
 ```bash
 docker run --rm \
-  -v zyntax-ndk-r29-work:/work -v "$PWD:/repo:ro" \
-  -e NATIVE_ARTIFACTS=/work/gradle-native/build-C8tGz6/artifacts \
-  -e JANSI_ARTIFACTS=/work/gradle-native/jansi/build-SVCXGV/artifacts \
-  zyntax-gradle-native-builder /repo/gradle/distribution/build.sh
+  -v zyntax-gradle-work:/work -v "$PWD:/repo:ro" \
+  -e SOURCE_INPUT=/work/gradle-native/gradle \
+  -e NATIVE_ARTIFACTS -e JANSI_ARTIFACTS \
+  zyntax-gradle-native-builder /repo/distribution/build.sh
 ```
 
-`prepare` as the script argument only clones and patches the source. The incomplete
-Windows checkout is an exact Git-object input; a fresh Linux checkout lives under
+`prepare` as the script argument only clones and patches the source. A fresh
+Linux checkout lives under
 `/work/gradle-native/distribution/8.14.3-android.1/source`. Rerunning the command
 resumes that stage with its own Gradle user home and recorded timestamp. Changed
 patch/component inputs require a fresh `WORK_DIR` under that distribution directory.
@@ -35,7 +40,7 @@ patch, permitting modified files with unchanged modes and declared regular-file
 additions. Exact file bytes and the two wrapper/verification additions are checked;
 unrelated tracked, staged or nonignored untracked inputs, symlinks and mode changes
 are rejected without mutating the source index/worktree. Run
-`python3 gradle/distribution/test_stage.py` for the small disposable-repository
+`python3 distribution/test_stage.py` for the small disposable-repository
 guard checks; these do not run Gradle or native/device tests.
 
 Upstream's build wrapper is Gradle 8.14.2. Its binary ZIP SHA-256 is pinned to
@@ -82,9 +87,13 @@ and discards metadata that cannot be trusted. No application paths are hardcoded
 Native component notices, exact source patch, base revision, build inputs and
 component hash manifest accompany the distribution through its source packaging
 specification. The upstream commit identifies the base, not unmodified Gradle.
+The binary ZIP does not contain component source JARs; these are separate release
+companions, with coverage described in [NOTICE.md](../NOTICE.md).
 Ncurses remains an explicit app-private terminal dependency, not a
 bundled system library. Combined native-component device probes passed, including
 real Jansi PTY/termios operations.
+
+## Verified pre-move release
 
 The 2026-09-09 source build produced
 `gradle-8.14.3-android-1-20260909081124+0000-bin.zip` (137,611,046 bytes), SHA-256
@@ -99,6 +108,14 @@ The corrected Scala compile-only graph also resolved its Zinc/JLine Jansi reques
 to the single owned 1.18 module. These checks do not claim reproducible ZIP bytes
 across fresh build paths.
 
+This immutable release was built before the Gradle-only history moved to
+`amitkhare/zyntax-gradle`. Its receipt deliberately retains the original
+`gradle/distribution/build.sh` recipe path; embedded patches, component sources
+and checksums are not rewritten. The current root-layout recipes and independent
+build environment are not claimed to have produced those already-verified bytes.
+Releases belong to [this repository](https://github.com/amitkhare/zyntax-gradle/releases),
+not the NDK repository.
+
 The unchanged verified ZIP passed the focused USB integration check on 2026-09-09
 (68.531 seconds; private log `run-7096449322066847556/output.log`). It exercised
 the selected client's native core/curses under a real PTY, daemon native process
@@ -110,4 +127,4 @@ nested Android mount table, including unrelated duplicate mounts. The isolated
 test daemon stopped normally; user projects, settings and daemons were untouched.
 Gradle's Jansi runtime-wrapper invocation remains unverified. The result covers
 this qualified distribution and exercised services, not arbitrary Gradle releases
-or all native features. Publication remains separate.
+or all native features. The build recipe does not publish artifacts.
