@@ -2,8 +2,9 @@
 
 This recipe source-builds exact Gradle 8.14.3 commit
 `e5ee1df3d88b8ca3a8074787a94f373e3090e1db`, using the upstream
-`:distributions-full:binDistributionZip` task. Host source compilation and archive
-verification passed; full Android Gradle integration is not yet verified.
+`:distributions-full:binDistributionZip` task. Host source compilation, archive
+checks and focused Android client/daemon/worker/VFS integration passed; the tested
+scope and remaining limitations are below.
 Nothing here modifies an installed Gradle, its extraction cache, a project's
 wrapper, or app/SDK source.
 
@@ -71,8 +72,7 @@ component hash manifest accompany the distribution through its source packaging
 specification. The upstream commit identifies the base, not unmodified Gradle.
 Ncurses remains an explicit app-private terminal dependency, not a
 bundled system library. Combined native-component device probes passed, including
-real Jansi PTY/termios operations. Full Gradle daemon/watcher/terminal integration
-and the release decision remain unfinished; f2fs VFS retention is not verified.
+real Jansi PTY/termios operations.
 
 The 2026-09-09 source build produced
 `gradle-8.14.3-android-1-20260909053352+0000-bin.zip` (137,589,545 bytes), SHA-256
@@ -82,4 +82,15 @@ JARs with no extra native variants, and every packaged notice/provenance file.
 It emits `verification.json` with the exact version, ZIP name, size and hash.
 The corrected Scala compile-only graph also resolved its Zinc/JLine Jansi request
 to the single owned 1.18 module. These checks do not claim reproducible ZIP bytes
-across fresh build paths or replace Android integration validation.
+across fresh build paths.
+
+The unchanged verified ZIP passed the focused USB integration check on 2026-09-09
+(63.359 seconds; private log `run-3513402018586241341/output.log`). It exercised
+the selected client's native core/curses under a real PTY, daemon native process
+and file-metadata services, and ordinary worker JNI in both builds. With explicit
+`--watch-fs`, the same daemon retained snapshots and observed filesystem events
+and input invalidation across two builds on F2FS, then stopped normally.
+Default F2FS support is not enabled or verified; this was an explicit diagnostic.
+Gradle's Jansi runtime-wrapper invocation remains unverified. The result covers
+this qualified distribution and exercised services, not arbitrary Gradle releases
+or all native features. Publication remains separate.
