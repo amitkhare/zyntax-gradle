@@ -10,6 +10,10 @@ native-platform Java companion for Android aarch64; map the shared Android
 platform identity to Android-named native resources in file-events. Generate
 authentic matching Java/native version values. Cross-compile native sources
 with Android NDK r29 for arm64-v8a/API 24 and static libc++.
+Build the original curses component against the checksum-pinned official
+Android ncurses package, with one Android resource identity. The ncurses
+package and terminfo database remain explicit terminal-runtime dependencies;
+they are not redistributed in this bundle.
 
 This is a standalone component/probe bundle, not a Gradle distribution.
 Original component licenses, SLF4J's MIT license, and official NDK notices

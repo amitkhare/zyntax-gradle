@@ -11,6 +11,10 @@ import net.rubygrapefruit.platform.file.FileInfo;
 import net.rubygrapefruit.platform.file.FileSystems;
 import net.rubygrapefruit.platform.internal.Platform;
 import net.rubygrapefruit.platform.internal.jni.NativeLibraryFunctions;
+import net.rubygrapefruit.platform.internal.jni.TerminfoFunctions;
+import net.rubygrapefruit.platform.terminal.TerminalOutput;
+import net.rubygrapefruit.platform.terminal.TerminalSize;
+import net.rubygrapefruit.platform.terminal.Terminals;
 import org.gradle.fileevents.FileEvents;
 import org.gradle.fileevents.FileWatchEvent;
 import org.gradle.fileevents.FileWatcher;
@@ -34,6 +38,17 @@ public final class NativeProbe {
         int mounts = nativeApi.get(FileSystems.class).getFileSystems().size();
         if (mounts == 0) throw new AssertionError("No native file-system records");
         System.out.println("native-filesystems=" + mounts);
+        Terminals terminals = nativeApi.get(Terminals.class);
+        if (!TerminfoFunctions.getVersion().equals(NativeLibraryFunctions.getVersion())) throw new AssertionError("Curses version mismatch");
+        if (!terminals.isTerminal(Terminals.Output.Stdout)) throw new AssertionError("Terminal probe requires stdout attached to a PTY");
+        TerminalOutput terminal = terminals.getTerminal(Terminals.Output.Stdout);
+        TerminalSize size = terminal.getTerminalSize();
+        if (size.getCols() <= 0 || size.getRows() <= 0) throw new AssertionError("PTY window size must be nonzero");
+        if (!terminal.supportsColor() || !terminal.supportsTextAttributes() || !terminal.supportsCursorMotion()) {
+            throw new AssertionError("Probe requires a color terminal with text attributes and cursor motion");
+        }
+        System.out.println("terminal=" + terminal + " size=" + size.getCols() + "x" + size.getRows()
+            + " stdin-tty=" + terminals.isTerminalInput() + " curses=" + TerminfoFunctions.getVersion());
         net.rubygrapefruit.platform.file.Files files = nativeApi.get(net.rubygrapefruit.platform.file.Files.class);
         Path watched = java.nio.file.Files.createDirectory(run.resolve("watched"));
         if (files.stat(watched.toFile()).getType() != FileInfo.Type.Directory) throw new AssertionError("Native directory stat failed");
@@ -58,7 +73,7 @@ public final class NativeProbe {
             watcher.shutdown();
             if (!watcher.awaitTermination(5, TimeUnit.SECONDS)) throw new AssertionError("Watcher shutdown timed out");
         }
-        System.out.println("PASS native load/version, stat/readdir/mounts, inotify create/remove/shutdown; work=" + run);
+        System.out.println("PASS native load/version, curses/terminfo/PTY, stat/readdir/mounts, inotify create/remove/shutdown; work=" + run);
     }
 
     private static void await(BlockingQueue<FileWatchEvent> events, FileWatchEvent.ChangeType type, String path) throws Exception {

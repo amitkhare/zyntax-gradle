@@ -14,6 +14,16 @@ grep -x 'Pkg.Revision = 29.0.14206865' "$ndk_dir/source.properties" >/dev/null
 mkdir -p "$work_dir"
 stage=$(mktemp -d "$work_dir/build-XXXXXX")
 
+# Reuse the official Android terminal dependency already pinned by this repo.
+ncurses_manifest=$(awk -F '\t' '$1 ~ /^ncurses_/ { print }' "$repo_dir/sources-debugger.tsv")
+[[ $(printf '%s\n' "$ncurses_manifest" | wc -l) == 1 ]]
+bash "$repo_dir/scripts/download-inputs.sh" <(printf '%s\n' "$ncurses_manifest") "${DOWNLOADS_DIR:-/work/downloads}"
+IFS=$'\t' read -r ncurses_archive ncurses_checksum ncurses_url <<<"$ncurses_manifest"
+dpkg-deb --extract "${DOWNLOADS_DIR:-/work/downloads}/$ncurses_archive" "$stage/ncurses"
+mapfile -d '' -t ncurses_headers < <(find "$stage/ncurses" -type f -path '*/include/curses.h' -print0)
+[[ ${#ncurses_headers[@]} == 1 ]]
+ncurses_prefix=${ncurses_headers[0]%/include/curses.h}
+
 prepare_source() {
     local name=$1 revision=$2
     test "$(git -c safe.directory="$source_dir/$name" -C "$source_dir/$name" rev-parse HEAD)" = "$revision"
@@ -53,6 +63,7 @@ cmake -S "$repo_dir/gradle" -B "$stage/cmake" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$ndk_dir/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static \
     -DNATIVE_PLATFORM_SOURCE="$stage/native-platform" -DFILE_EVENTS_SOURCE="$stage/file-events" \
+    -DNCURSES_PREFIX="$ncurses_prefix" \
     -DCMAKE_INSTALL_PREFIX="$stage/artifacts"
 cmake --build "$stage/cmake" --parallel "$build_jobs"
 cmake --install "$stage/cmake"
@@ -60,21 +71,31 @@ mkdir -p "$stage/artifacts/licenses" "$stage/artifacts/java"
 cp "$stage/native-platform/LICENSE" "$stage/artifacts/licenses/native-platform-LICENSE"
 cp "$stage/file-events/LICENSE" "$stage/artifacts/licenses/file-events-LICENSE"
 cp "$repo_dir/gradle/licenses/slf4j-LICENSE.txt" "$stage/artifacts/licenses/"
+cp "$ncurses_prefix/share/doc/ncurses/copyright" "$stage/artifacts/licenses/ncurses-copyright"
+printf '%s\n' "$ncurses_manifest" > "$stage/artifacts/ncurses-input.tsv"
 cp "$ndk_dir/NOTICE" "$stage/artifacts/licenses/ndk-NOTICE"
 cp "$ndk_dir/NOTICE.toolchain" "$stage/artifacts/licenses/ndk-NOTICE.toolchain"
 cp "$np/build/generated/version/header/native_platform_version.h" "$stage/artifacts/"
 cp "$stage/file-events/build/generated/sources/headers/version/fileevents_version.h" "$stage/artifacts/"
-jar --create --file "$stage/artifacts/java/native-platform-android.jar" -C "$np/build/classes/java/main" .
-jar --create --file "$stage/artifacts/java/gradle-fileevents-java.jar" -C "$stage/file-events/build/classes/java/main" .
+np_resources="$stage/native-platform-resources/net/rubygrapefruit/platform/android-aarch64"
+fe_resources="$stage/file-events-resources/net/rubygrapefruit/platform/aarch64-linux-android"
+mkdir -p "$np_resources" "$fe_resources"
+cp "$stage/artifacts/lib/libnative-platform.so" "$stage/artifacts/lib/libnative-platform-curses.so" "$np_resources/"
+cp "$stage/artifacts/lib/libgradle-fileevents.so" "$fe_resources/"
+jar --create --file "$stage/artifacts/java/native-platform-android.jar" \
+    -C "$np/build/classes/java/main" . -C "$stage/native-platform-resources" .
+jar --create --file "$stage/artifacts/java/gradle-fileevents-java.jar" \
+    -C "$stage/file-events/build/classes/java/main" . -C "$stage/file-events-resources" .
+mkdir -p "$stage/artifacts/sources"
+jar --create --file "$stage/artifacts/sources/native-platform-sources.jar" \
+    -C "$np/src/main/java" . -C "$np/build/generated/version/java" .
+jar --create --file "$stage/artifacts/sources/gradle-fileevents-sources.jar" \
+    -C "$stage/file-events/src/main/java" . -C "$stage/file-events/build/generated/sources/java/version" .
 bash "$repo_dir/gradle/verify-native.sh" "$stage"
 
 # A standalone Android-identified probe bundle, never a modified Gradle runtime.
 probe="$stage/artifacts/probe"
-resources="$stage/probe-resources/net/rubygrapefruit/platform"
-mkdir -p "$probe/lib" "$resources/android-aarch64" "$resources/aarch64-linux-android" "$stage/probe-classes"
-cp "$stage/artifacts/lib/libnative-platform.so" "$resources/android-aarch64/"
-cp "$stage/artifacts/lib/libgradle-fileevents.so" "$resources/aarch64-linux-android/"
-jar --create --file "$probe/lib/android-native-resources.jar" -C "$stage/probe-resources" .
+mkdir -p "$probe/lib" "$stage/probe-classes"
 cp "$stage/artifacts/java/"*.jar "$probe/lib/"
 slf4j=$(find "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.slf4j/slf4j-api/1.7.36" -name '*.jar' -print -quit)
 test -n "$slf4j"

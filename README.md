@@ -1,6 +1,6 @@
 # Android-host Gradle native components
 
-Source ports of the core native-platform and file-events components used by Gradle 8.14.3. This is **not a Gradle distribution** and does not modify a Wrapper, installed Gradle, or its native extraction cache. The standalone Android component probe passed; integration into a Gradle distribution remains unverified.
+Source ports of the native-platform and file-events components used by Gradle 8.14.3. This is **not a Gradle distribution** and does not modify a Wrapper, installed Gradle, or its native extraction cache. The standalone Android core and terminal component probes passed; integration into a Gradle distribution remains unverified.
 
 ## Inputs and build
 
@@ -18,14 +18,14 @@ docker build -f gradle/Dockerfile -t zyntax-gradle-native-builder .
 docker run --rm \
   -v zyntax-ndk-r29-work:/work \
   -v "$PWD:/repo:ro" \
-  zyntax-gradle-native-builder bash /repo/gradle/build-native.sh
+  zyntax-gradle-native-builder /repo/gradle/build-native.sh
 ```
 
 The builder adds a Linux host JDK 17. Android output uses official NDK r29 (`29.0.14206865`), Clang 21, `arm64-v8a`, API 24, static libc++, and 16 KB ELF segment alignment. The selected NDK's system JNI headers define the target JNI ABI. No glibc shim, binary rewriting, fake GNU library name, or disabled native check is involved.
 
 Upstream wrappers perform only Java/header/version generation: file-events uses Gradle 8.10.2 `compileJava`; native-platform uses Gradle 7.5 `writeNativeVersionSources`, followed by host `javac --release 8 -h` over its complete Java sources. Java 8 bytecode is suitable for Gradle 8.14.3; this does not try to reproduce native-platform's historical Java 5/6 targets. These build-tool distributions/cache are isolated under `/work/gradle-native/gradle-home`. Builds use two workers, a 1536 MB Gradle heap, and `--no-scan` to prevent build-scan upload. Nothing is published.
 
-Each build prints its fresh `/work/gradle-native/build-*/` directory. `artifacts/` contains the two shared libraries, paired source-built Java component JARs, generated version headers, notices, and a dedicated probe bundle. Those JARs are component outputs, not replacements to copy into stock Gradle.
+Each build prints its fresh `/work/gradle-native/build-*/` directory. `artifacts/` contains three shared libraries, paired source-built Java component JARs with their own Android native resources, Java source JARs, generated version headers, notices, and a dedicated probe bundle. Keeping resources in each component JAR also supports Gradle's isolated test-worker classloader. Those JARs are component outputs, not replacements to copy into stock Gradle.
 
 ## Source adaptations and identity
 
@@ -35,12 +35,13 @@ The native-platform Java companion is explicitly built for Android aarch64. It v
 
 ```text
 net/rubygrapefruit/platform/android-aarch64/libnative-platform.so
+net/rubygrapefruit/platform/android-aarch64/libnative-platform-curses.so
 net/rubygrapefruit/platform/aarch64-linux-android/libgradle-fileevents.so
 ```
 
 Upstream extraction, loading and version checks remain intact. Native-platform's `NativeVersion` is a native-source/build-tool fingerprint, not its Maven version. The upstream generator produces both its C header and Java constant; all Java sources are rebuilt because the constant is inlined in callers. No prebuilt fingerprint is copied over changed sources. File-events likewise uses its upstream version generator for both sides. The probe bundle is intentionally Android-only; publishing a universal Java component or choosing a Gradle distribution remains separate work.
 
-The optional native-platform curses library is outside this core-only build. This work does not claim all Gradle native features or arbitrary Gradle releases are Android-compatible.
+The curses component is also source-built for `android-aarch64`, using the official Android `ncurses` package already checksum-pinned in `sources-debugger.tsv`. Its headers and library are extracted only as build inputs; the package is not modified or bundled. The resulting JNI library depends on the package's genuine `libncursesw.so.6` SONAME. Install `ncurses` in the same app-private terminal runtime and supply its terminfo directory through `TERMINFO` (normally `$PREFIX/share/terminfo`). This is an explicit terminal-package dependency, not a standalone managed-runtime bundle. No GNU ncurses5/6 candidate names or desktop terminfo paths are used by the Android selector. This work does not claim all Gradle native features or arbitrary Gradle releases are Android-compatible.
 
 ## Verification and standalone probe
 
@@ -48,7 +49,7 @@ The optional native-platform curses library is outside this core-only build. Thi
 
 The build on 2026-09-09 used host `javac 17.0.20.1`. Both shared libraries linked with no undefined symbols and needed only `libc.so`, `libm.so`, and `libdl.so`; every LOAD segment had `p_align=0x4000`. The Android ELF identification note records API 24, r29 and build 14206865. The source-generated native-platform fingerprint was `d9b662c5bbedb6418f2007170aa8ed97211391cd673d3d2a6be45c929c7f0dd6`; file-events' generator produced `0.2.7`.
 
-The Android-identified build `build-mxQoeq` produced:
+The initial core-only Android build `build-mxQoeq` produced:
 
 ```text
 11d8f124dc370a1ff39ce1b7a1d12b6bc1c9a8c8290848fff83bb39a2b22e738  libnative-platform.so
@@ -57,15 +58,19 @@ The Android-identified build `build-mxQoeq` produced:
 
 These identify this build, not a claim of byte-for-byte reproducibility across fresh build paths. Upstream unused-parameter, deprecated-`readdir_r`, and formatting warnings were visible; they were not suppressed.
 
-After explicit device approval, unpack `android-native-probe.tar.gz` into an app-private directory, set `JAVA_HOME` to the app-private JDK, and run:
+The terminal build `build-C8tGz6` also passed host compilation, generated JNI/version checks and embedded-resource hash checks. Its `libnative-platform-curses.so` SHA-256 is `11d331a0a1430415d60a91aeaeb40ff662c794b0497ddd3bf45c061da76a7228`; its only non-system dependency is the declared `libncursesw.so.6`. All three JNI libraries have 16 KB LOAD alignment and no RPATH/RUNPATH. The terminal probe archive SHA-256 is `989f70ac9504a86545a5aa7c7effcb751fdd741fb03af884e9270d6af8f2186d`. This build consumes ncurses `6.6.20260307+really6.5.20250830`, package SHA-256 `f44bbfdc3d42ec0217bffa978309390e59cea5a48a9a83226d4a496c42ad0b99`; it preserves the source-generated native-platform/file-events versions above.
+
+After explicit device approval, unpack `android-native-probe.tar.gz` into an app-private directory, set `JAVA_HOME` to the app-private JDK and `TERMINFO` to the installed app-private ncurses database, then run inside a PTY with a nonzero window size and matching `TERM` (such as `xterm-256color`):
 
 ```bash
 bash ./run-probe.bash <app-private-probe-work-directory>
 ```
 
-The standalone Java probe creates a fresh `run-*` child, uses upstream resource extraction/version checks, verifies native system/filesystem information and stat/readdir, then checks inotify create/remove events and orderly watcher shutdown. It retains its private extraction directory for inspection and never reads or changes a Gradle installation/cache. A `PASS` requires actual JNI calls and filesystem events, not merely a successful Java build.
+The standalone Java probe creates a fresh `run-*` child, uses upstream resource extraction/version checks, verifies curses/terminfo capabilities and PTY size, native system/filesystem information and stat/readdir, then checks inotify create/remove events and orderly watcher shutdown. It retains its private extraction directory for inspection and never reads or changes a Gradle installation/cache. A `PASS` requires actual JNI calls and filesystem events, not merely a successful Java build. A pipe-only harness cannot validate the terminal probe; use an app-private PTY provider.
 
-On 2026-09-09 the explicitly approved USB probe passed in the app-private Android runtime (one test, 1.495 seconds). It loaded the genuine native-platform fingerprint above with identity `android-aarch64`, reported Linux/aarch64 and 220 native filesystem records, and verified file-events `0.2.7` with actual `CREATED`/`REMOVED` events and orderly shutdown. The private harness log is `run-6932603730786287426/output.log`. The tested probe archive SHA-256 is `9319fddd455ea5e9fdb8716196c7f939457b8120184936cc259cc5762be29cf6`. This proves the paired components' exercised JNI and inotify behavior, not Gradle daemon integration, distribution selection, or untested native services.
+On 2026-09-09 the terminal probe passed within an explicitly approved combined USB run (one instrumentation test, 4.154 seconds). It verified the genuine native-platform fingerprint and `android-aarch64` identity, 220 filesystem records, matching curses version, real `xterm-256color` terminfo capabilities (color, text attributes and cursor motion), an 80x24 PTY with terminal stdin, and inotify `CREATED`/`REMOVED` events plus watcher shutdown. The private harness log is `run-8565402705635806309/output.log`. Read-only mount inspection identified the app-private project filesystem as F2FS; this component result does **not** establish Gradle VFS support or retained snapshots on F2FS. Full Gradle integration remains separate validation.
+
+On 2026-09-09 the initial core-only USB probe passed in the app-private Android runtime (one test, 1.495 seconds). It loaded the genuine native-platform fingerprint above with identity `android-aarch64`, reported Linux/aarch64 and 220 native filesystem records, and verified file-events `0.2.7` with actual `CREATED`/`REMOVED` events and orderly shutdown. The private harness log is `run-6932603730786287426/output.log`. The tested probe archive SHA-256 is `9319fddd455ea5e9fdb8716196c7f939457b8120184936cc259cc5762be29cf6`. This proves the paired components' exercised JNI and inotify behavior, not Gradle daemon integration, distribution selection, or untested native services.
 
 ## Notices
 

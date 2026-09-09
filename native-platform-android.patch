@@ -74,9 +74,14 @@ diff --git a/native-platform/src/main/java/net/rubygrapefruit/platform/internal/
              }
              return platform;
          }
-@@ -302,8 +274,8 @@
+@@ -302,8 +274,13 @@
 -    private static class LinuxAarch64 extends Linux {
 +    private static class AndroidAarch64 extends Linux {
++        @Override
++        List<String> getCursesVariants() {
++            return getLibraryVariants();
++        }
++
          @Override
          public String getId() {
 -            return "linux-aarch64";
