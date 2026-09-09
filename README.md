@@ -6,6 +6,12 @@ Stock Gradle already built the Android samples and the complete Zyntax APK/AABs 
 
 The [source-built distribution](distribution/README.md) records the exact verified ZIP, source changes and remaining limits. [Jansi](jansi/README.md) has separate source and probe evidence. Runtime selection is explicit: these recipes do not modify a project's Wrapper, installed Gradle, native extraction cache or JVM OS properties. The release destination is [amitkhare/zyntax-gradle](https://github.com/amitkhare/zyntax-gradle/releases).
 
+The optional [headless launcher](launcher/README.md) uses the official Wrapper to
+download the exact release with SHA-256 verification into standard
+`~/.gradle/wrapper/dists` (or the configured Gradle user home). It also accepts an
+explicit local installation. User project Wrapper files and app/SDK code remain
+unchanged; complete Android prerequisite setup and Studio integration are separate work.
+
 ## Repository and release history
 
 The Gradle-only source history was moved out of the former combined toolchain repository. Current recipes live at this repository's root and use an independent Docker volume. The verified 2026-09-09 ZIP was built **before** that move: its embedded provenance and source companions retain their original `gradle/...` recipe paths. Those immutable bytes and hashes are not rewritten to describe the new layout. The relocated recipes have not been rebuilt or device-tested merely by moving them.

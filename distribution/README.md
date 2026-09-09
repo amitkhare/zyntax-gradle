@@ -125,7 +125,8 @@ snapshots and invalidated changed inputs across two builds on F2FS. The unchange
 task remained up-to-date and the changed output updated. This exercised the real
 nested Android mount table, including unrelated duplicate mounts. The isolated
 test daemon stopped normally; user projects, settings and daemons were untouched.
-Gradle's Jansi runtime-wrapper invocation remains unverified. The result covers
+Gradle's Jansi runtime-wrapper invocation subsequently passed the focused check
+below. The result covers
 this qualified distribution and exercised services, not arbitrary Gradle releases
 or all native features. The build recipe does not publish artifacts.
 
@@ -133,3 +134,31 @@ The unchanged distribution and source companions are published in the dedicated
 [Gradle release](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-8.14.3-android-1-20260909081124).
 All seven uploaded assets match their verified local sizes and SHA-256 hashes.
 The former NDK-repository release and tag were removed after verification.
+
+### Jansi wrapper check
+
+`GradleJansiProbe.java` calls the selected distribution's package-private console
+wrapper directly from the same Java package. Compile it with `javac --release 17
+-cp "$GRADLE_HOME/lib/*" -d "$PROBE_CLASSES" GradleJansiProbe.java`; only the probe
+class is generated, and no Gradle library is replaced or added. In a fresh JVM
+inside an app-private PTY with nonzero dimensions, run:
+
+```bash
+TERM=screen "$JAVA_HOME/bin/java" -cp "$PROBE_CLASSES:$GRADLE_HOME/lib/*" \
+  org.gradle.internal.logging.sink.GradleJansiProbe "$PROBE_WORK"
+```
+
+`PROBE_WORK` must be an existing app-private directory; the probe creates one
+fresh child and leaves ordinary Gradle caches untouched. `screen` exercises the
+wrapper's native `isatty` branch rather than its xterm shortcut. The check covers
+Gradle's Android resource selection/extraction, exact resource bytes, real JNI
+PTY detection/window size, and preserved ANSI with reset on stream close.
+It does not run a build or claim interactive rich-console rendering.
+
+On 9 September 2026 this check passed using the release downloaded by the
+official Wrapper into the normal app-home cache. It verified Android library
+selection/extraction, real JNI and an 80x24 PTY, then the actual console wrapper's
+ANSI preservation/reset behavior. The combined download/cache/local-selection
+and Jansi invocation took 38.408 seconds, one USB instrumentation test.
+Private evidence: `run-1004036333415454146/output.log`,
+`gradle-delivery.zBzGur/jansi.log`. No build or app installation was repeated.

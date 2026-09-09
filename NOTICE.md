@@ -12,6 +12,10 @@ relicense upstream work or provide a legal-compliance guarantee.
   `e5ee1df3d88b8ca3a8074787a94f373e3090e1db`, with the exact Android changes in
   [distribution/source.patch](distribution/source.patch). Gradle's original
   license and third-party notices remain in the binary distribution.
+- The standalone launcher includes the unmodified official Gradle Wrapper script
+  and JAR from the same revision, under Apache-2.0. Its exact upstream checksum
+  and source are recorded in [launcher/README.md](launcher/README.md); the JAR
+  retains its embedded license, and `launcher/LICENSE` accompanies the script.
 - Native-platform `0.22-milestone-28`: upstream revision
   `87f4647e90db6006bf357db0ba7fa29925dcc32e`; file-events `0.2.7`: upstream revision
   `08be35d81f4d6336ce4666122c0c72a97b11a7e9`. Both are Apache-2.0. Their original
