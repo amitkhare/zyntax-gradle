@@ -128,3 +128,8 @@ test daemon stopped normally; user projects, settings and daemons were untouched
 Gradle's Jansi runtime-wrapper invocation remains unverified. The result covers
 this qualified distribution and exercised services, not arbitrary Gradle releases
 or all native features. The build recipe does not publish artifacts.
+
+The unchanged distribution and source companions are published in the dedicated
+[Gradle release](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-8.14.3-android-1-20260909081124).
+All seven uploaded assets match their verified local sizes and SHA-256 hashes.
+The former NDK-repository release and tag were removed after verification.
