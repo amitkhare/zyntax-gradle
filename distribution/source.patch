@@ -1,0 +1,145 @@
+diff --git a/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt b/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt
+--- a/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt
++++ b/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt
+@@ -67,5 +67,5 @@
+     val googleHttpClientGson = "com.google.http-client:google-http-client-gson"
+     val googleOauthClient = "com.google.oauth-client:google-oauth-client"
+-    val gradleFileEvents = "org.gradle.fileevents:gradle-fileevents"
++    val gradleFileEvents = "app.zyntax.gradle:gradle-fileevents"
+     val gradleIdeStarter = "org.gradle.buildtool.internal:gradle-ide-starter:$gradleIdeStarterVersion"
+     val gradleProfiler = "org.gradle.profiler:gradle-profiler"
+@@ -98,5 +98,5 @@
+     val jakartaActivation = "com.sun.activation:jakarta.activation"
+     val jakartaXmlBind = "jakarta.xml.bind:jakarta.xml.bind-api"
+-    val jansi = "org.fusesource.jansi:jansi"
++    val jansi = "app.zyntax.gradle:jansi"
+     val jatl = "com.googlecode.jatl:jatl"
+     val javaPoet = "com.squareup:javapoet"
+@@ -143,5 +143,5 @@
+     val mavenResolverTransportHttp = "org.apache.maven.resolver:maven-resolver-transport-http"
+     val minlog = "com.esotericsoftware.minlog:minlog"
+-    val nativePlatform = "net.rubygrapefruit:native-platform"
++    val nativePlatform = "app.zyntax.gradle:native-platform"
+     val objenesis = "org.objenesis:objenesis"
+     val plexusCipher = "org.sonatype.plexus:plexus-cipher"
+diff --git a/packaging/distributions-dependencies/build.gradle.kts b/packaging/distributions-dependencies/build.gradle.kts
+--- a/packaging/distributions-dependencies/build.gradle.kts
++++ b/packaging/distributions-dependencies/build.gradle.kts
+@@ -24,5 +24,5 @@
+ val mavenVersion = "3.9.5"
+ val mavenResolverVersion = "1.9.16" // Should remain in-sync with `mavenVersion`
+-val nativePlatformVersion = "0.22-milestone-28"
++val nativePlatformVersion = "0.22-milestone-28-zyntax.1"
+ val slf4jVersion = "1.7.36"
+ val spockVersion = if (isBundleGroovy4) "2.3-groovy-4.0" else "2.3-groovy-3.0"
+@@ -73,5 +73,5 @@
+         api(libs.errorProneAnnotations) { version { strictly("2.36.0") } } // don't forget to upgrade errorprone in gradlebuild.code-quality.gradle.kts
+         api(libs.fastutil)              { version { strictly("8.5.2") }}
+-        api(libs.gradleFileEvents)      { version { strictly("0.2.7") }}
++        api(libs.gradleFileEvents)      { version { strictly("0.2.7-zyntax.1") }}
+         api(libs.gradleProfiler)        { version { strictly("0.21.0-alpha-4") }}
+         api(libs.develocityTestAnnotation) { version { strictly("2.0.1") }}
+@@ -120,5 +120,5 @@
+         api(libs.jakartaActivation)     { version { strictly("2.0.1") }}
+         api(libs.jakartaXmlBind)        { version { strictly("3.0.0") }}
+-        api(libs.jansi)                 { version { strictly("1.18"); because("2.x changes the API") }}
++        api(libs.jansi)                 { version { strictly("1.18-zyntax.1"); because("Android host source build; 2.x changes the API") }}
+         api(libs.jatl)                  { version { strictly("0.2.3") }}
+         api(libs.javaPoet)              { version { strictly("1.13.0") } }
+diff --git a/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts b/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts
+--- a/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts
++++ b/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts
+@@ -15,5 +15,15 @@
+  */
+ 
+ repositories {
++    // Android-host components have their own coordinates and strict checksums.
++    exclusiveContent {
++        forRepository {
++            maven {
++                name = "Android Gradle components"
++                url = uri(providers.environmentVariable("ZYNTAX_GRADLE_COMPONENTS_REPOSITORY").get())
++            }
++        }
++        filter { includeGroup("app.zyntax.gradle") }
++    }
+     maven {
+         name = "Gradle public repository"
+diff --git a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
+--- a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
++++ b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
+@@ -17,5 +17,4 @@
+ import gradlebuild.basics.GradleModuleApiAttribute
+ import gradlebuild.basics.PublicApi
+-import gradlebuild.basics.buildVersionQualifier
+ import gradlebuild.basics.kotlindsl.configureKotlinCompilerForGradleBuild
+ import gradlebuild.basics.tasks.ClasspathManifest
+@@ -269,8 +268,5 @@
+         moduleIdentity.version.map { "gradle-${it.baseVersion.version}" }
+     } else {
+-        moduleIdentity.version.map { "gradle-${it.version}" }.map {
+-            if (buildVersionQualifier.isPresent) it.replace("-${buildVersionQualifier.get()}", "")
+-            else it
+-        }
++        moduleIdentity.version.map { "gradle-${it.version}" }
+     }
+ 
+@@ -283,5 +279,5 @@
+         archiveBaseName = "gradle"
+         archiveClassifier = name
+-        archiveVersion = moduleIdentity.version.map { it.baseVersion.version }
++        archiveVersion = moduleIdentity.version.map { if (normalized) it.baseVersion.version else it.version }
+ 
+         destinationDirectory = project.layout.buildDirectory.dir(disDir)
+@@ -290,5 +286,8 @@
+         into(zipRootFolder) {
+             with(distributionSpec)
++            from(providers.gradleProperty("androidComponentsNotices")) {
++                into("licenses/android-host")
++            }
+         }
+     }
+ 
+diff --git a/platforms/core-runtime/native/src/main/java/org/gradle/internal/nativeintegration/jansi/DefaultJansiRuntimeResolver.java b/platforms/core-runtime/native/src/main/java/org/gradle/internal/nativeintegration/jansi/DefaultJansiRuntimeResolver.java
+--- a/platforms/core-runtime/native/src/main/java/org/gradle/internal/nativeintegration/jansi/DefaultJansiRuntimeResolver.java
++++ b/platforms/core-runtime/native/src/main/java/org/gradle/internal/nativeintegration/jansi/DefaultJansiRuntimeResolver.java
+@@ -17,5 +17,6 @@
+ package org.gradle.internal.nativeintegration.jansi;
+ 
++import net.rubygrapefruit.platform.internal.Platform;
+ import java.util.Locale;
+ 
+ import static org.gradle.internal.nativeintegration.jansi.JansiOperatingSystemSupport.*;
+@@ -51,16 +52,6 @@
+     @Override
+     public String getPlatform() {
+-        return getOperatingSystem() + getBitModel();
+-    }
+-
+-    private int getBitModel() {
+-        String prop = System.getProperty("sun.arch.data.model");
+-        if (prop == null) {
+-            prop = System.getProperty("com.ibm.vm.bitmode");
+-        }
+-        if (prop != null) {
+-            return Integer.parseInt(prop);
+-        }
+-        return -1;
++        // The Android distribution uses its declared, validated native identity.
++        return Platform.current().getId();
+     }
+ }
+diff --git a/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts b/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts
+--- a/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts
++++ b/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts
+@@ -26,5 +26,10 @@
+ 
+ applyAutomaticUpgradeOfCapabilities()
+ dependencies {
++    modules {
++        module("org.fusesource.jansi:jansi") {
++            replacedBy(libs.jansi, "Android host source-built Jansi 1.18")
++        }
++    }
+     components {
+         // Gradle distribution - minify: remove unused transitive dependencies
