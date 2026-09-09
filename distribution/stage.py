@@ -3,7 +3,9 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
@@ -17,39 +19,54 @@ FE = "0.2.7-zyntax.1"
 JANSI = "1.18-zyntax.1"
 
 
-def verify_source_delta(stage, verification):
+def verify_source_delta(stage, verification, patch):
     """Reconstruct the declared delta, without accepting unrelated source inputs."""
     source = stage / "source"
-    patch = Path(__file__).with_name("source.patch").resolve()
-    def git(*args):
-        return subprocess.check_output(["git", "-C", str(source), *args])
-    if git("diff", "--cached", "--name-only") or git("ls-files", "--others", "--exclude-standard"):
-        raise ValueError("Unexpected staged or untracked source input")
+    environment = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+    for name in ("GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"):
+        environment.pop(name, None)
+    def git(*args, env=environment):
+        return subprocess.check_output(["git", "-c", "core.filemode=true", "-C", str(source), *args], env=env)
+    if git("diff", "--cached", "--name-only"):
+        raise ValueError("Unexpected staged source input")
     if git("diff", "--summary", "HEAD"):
         raise ValueError("Unexpected source mode, rename or type change")
-    paths = [line.split("\t", 2)[2] for line in
-             git("apply", "--numstat", str(patch)).decode().splitlines()]
+    expected, modes, additions = {}, {}, set()
+    source_objects = (source / os.fsdecode(git("rev-parse", "--git-path", "objects").strip())).resolve()
     with tempfile.TemporaryDirectory(prefix="source-delta-", dir=stage) as temporary:
-        expected_root = Path(temporary)
-        for relative in paths:
-            path = Path(relative)
-            if path.is_absolute() or ".." in path.parts:
-                raise ValueError(f"Unexpected patch path: {relative}")
-            destination = expected_root / path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(git("show", f"HEAD:{relative}"))
-        subprocess.run(["git", "apply", str(patch)], cwd=expected_root, check=True)
-        expected = {relative: (expected_root / relative).read_bytes() for relative in paths}
+        temporary = Path(temporary)
+        (temporary / "objects").mkdir()
+        isolated = dict(environment, GIT_INDEX_FILE=str(temporary / "index"),
+                        GIT_OBJECT_DIRECTORY=str(temporary / "objects"),
+                        GIT_ALTERNATE_OBJECT_DIRECTORIES=str(source_objects))
+        git("read-tree", "HEAD", env=isolated)
+        git("apply", "--cached", str(patch.resolve()), env=isolated)
+        records = git("diff", "--cached", "--raw", "--no-renames", "--no-abbrev", "-z", "HEAD", env=isolated).split(b"\0")
+        for offset in range(0, len(records) - 1, 2):
+            old_mode, new_mode, _, blob, change = records[offset].decode("ascii").split()
+            old_mode = old_mode.removeprefix(":")
+            relative = os.fsdecode(records[offset + 1])
+            if change == "A" and old_mode == "000000" and new_mode == "100644":
+                additions.add(relative)
+            elif not (change == "M" and old_mode == new_mode and new_mode in ("100644", "100755")):
+                raise ValueError(f"Unsupported source patch change: {change} {relative}")
+            expected[relative] = git("cat-file", "blob", blob, env=isolated)
+            modes[relative] = new_mode
     wrapper = "gradle/wrapper/gradle-wrapper.properties"
     expected[wrapper] = git("show", f"HEAD:{wrapper}") + (
         b"\ndistributionSha256Sum=7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999\n")
     expected["gradle/verification-metadata.xml"] = verification
-    changed = set(git("diff", "HEAD", "--name-only").decode().splitlines())
-    if changed != set(expected):
-        raise ValueError(f"Unexpected source delta: {sorted(changed.symmetric_difference(expected))}")
+    modes.update({wrapper: "100644", "gradle/verification-metadata.xml": "100644"})
+    untracked = {os.fsdecode(path) for path in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0") if path}
+    if untracked != additions:
+        raise ValueError(f"Unexpected untracked source delta: {sorted(untracked.symmetric_difference(additions))}")
+    changed = {os.fsdecode(path) for path in git("diff", "HEAD", "--name-only", "-z").split(b"\0") if path}
+    if changed != set(expected) - additions:
+        raise ValueError(f"Unexpected tracked source delta: {sorted(changed.symmetric_difference(set(expected) - additions))}")
     for relative, content in expected.items():
         actual = source / relative
-        if actual.is_symlink() or actual.read_bytes() != content:
+        mode = actual.lstat().st_mode
+        if not stat.S_ISREG(mode) or bool(mode & 0o111) != (modes[relative] == "100755") or actual.read_bytes() != content:
             raise ValueError(f"Source differs from declared inputs: {relative}")
 
 
@@ -161,11 +178,12 @@ def main():
     if path.read_bytes() not in (pristine, generated):
         raise ValueError("Verification metadata has unrelated changes")
     path.write_bytes(generated)
-    verify_source_delta(stage, generated)
+    patch_path = Path(__file__).with_name("source.patch").resolve()
+    verify_source_delta(stage, generated, patch_path)
     manifest = (json.dumps(records, indent=2) + "\n").encode()
     write_once(stage / "component-inputs.json", manifest)
     provenance = stage / "notices/distribution"
-    patch = Path(__file__).with_name("source.patch").read_bytes()
+    patch = patch_path.read_bytes()
     write_once(provenance / "source.patch", patch)
     write_once(provenance / "component-inputs.json", manifest)
     (provenance / "SOURCE-BUILD.properties").write_bytes((

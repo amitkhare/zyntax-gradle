@@ -30,9 +30,13 @@ Windows checkout is an exact Git-object input; a fresh Linux checkout lives unde
 resumes that stage with its own Gradle user home and recorded timestamp. Changed
 patch/component inputs require a fresh `WORK_DIR` under that distribution directory.
 No old stage is deleted automatically.
-Before compilation, the source delta is reconstructed from the pinned patch and
-the two declared wrapper/verification additions; unrelated tracked, staged or
-nonignored untracked source inputs are rejected.
+Before compilation, a temporary Git index/object store reconstructs the pinned
+patch, permitting modified files with unchanged modes and declared regular-file
+additions. Exact file bytes and the two wrapper/verification additions are checked;
+unrelated tracked, staged or nonignored untracked inputs, symlinks and mode changes
+are rejected without mutating the source index/worktree. Run
+`python3 gradle/distribution/test_stage.py` for the small disposable-repository
+guard checks; these do not run Gradle or native/device tests.
 
 Upstream's build wrapper is Gradle 8.14.2. Its binary ZIP SHA-256 is pinned to
 `7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999`, verified from
