@@ -1,11 +1,14 @@
-Android-host source ports for native-platform 0.22-milestone-28 and
-Gradle file-events 0.2.7.
+Android-host source ports for native-platform and Gradle file-events.
 
-Base sources:
-https://github.com/gradle/native-platform/commit/87f4647e90db6006bf357db0ba7fa29925dcc32e
-https://github.com/gradle/gradle-fileevents/commit/08be35d81f4d6336ce4666122c0c72a97b11a7e9
+Base repositories:
+https://github.com/gradle/native-platform
+https://github.com/gradle/gradle-fileevents
+Exact selected source commits, component profile and patch hashes are recorded
+in SOURCE-PROVENANCE.properties beside this notice. A build profile is not a
+claim that the corresponding full Gradle distribution has been qualified.
 
-Changes: scope sysctl to Apple and GNU strerror_r to glibc; build the
+Changes: scope sysctl to Apple where upstream has not already done so, and
+GNU strerror_r to glibc; build the
 native-platform Java companion for Android aarch64; map the shared Android
 platform identity to Android-named native resources in file-events. Generate
 authentic matching Java/native version values. Cross-compile native sources
@@ -16,5 +19,6 @@ package and terminfo database remain explicit terminal-runtime dependencies;
 they are not redistributed in this bundle.
 
 This is a standalone component/probe bundle, not a Gradle distribution.
-Original component licenses, SLF4J's MIT license, and official NDK notices
-are included in licenses/.
+Original component licenses and official NDK notices are included in licenses/.
+The standalone file-events probe also includes SLF4J and its MIT license;
+the integrated file-events API uses Java's built-in logging.

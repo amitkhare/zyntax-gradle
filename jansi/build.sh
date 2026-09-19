@@ -49,6 +49,7 @@ cmake -S "$recipe_dir" -B "$stage/cmake" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$ndk_dir/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 \
+    -DJANSI_API=1 \
     -DJANSI_NATIVE_SOURCE="$stage/native-source" -DHAWTJNI_SOURCE="$stage/hawtjni-source" \
     -DGENERATED_JNI="$stage/generated-jni" \
     -DCMAKE_INSTALL_PREFIX="$stage/artifacts"

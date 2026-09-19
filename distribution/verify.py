@@ -8,12 +8,14 @@ from pathlib import Path
 import sys
 import zipfile
 
+from targets import load_target
 
 def main():
     stage = Path(sys.argv[1]).resolve()
+    target = load_target(sys.argv[2], require_recipe=True)
     timestamp = (stage / "build-timestamp").read_text().strip()
-    version = f"8.14.3-android-1-{timestamp}"
-    archive = stage / "source/packaging/distributions-full/build/distributions" / f"gradle-{version}-bin.zip"
+    version = f"{target['version']}-android-{target['recipe']['portRevision']}-{timestamp}"
+    archive = stage / "source" / target["distributionProjectPath"] / "build/distributions" / f"gradle-{version}-bin.zip"
     prefix = f"gradle-{version}/"
     records = json.loads((stage / "component-inputs.json").read_text())
     components = [entry for entry in records if entry["artifact"].endswith(".jar")
@@ -28,7 +30,7 @@ def main():
                 raise ValueError(f"Component differs from staged source build: {name}")
         expected_components = {Path(entry["artifact"]).name for entry in components}
         actual_components = {Path(name).name for name in names if name.endswith(".jar") and
-                             Path(name).name.startswith(("native-platform-", "gradle-fileevents-", "jansi-"))}
+                             Path(name).name.startswith(("native-platform-", "gradle-fileevents-", "file-events-", "jansi-"))}
         if actual_components != expected_components:
             raise ValueError(f"Unexpected native component artifacts: {actual_components}")
         for notice in (stage / "notices").rglob("*"):
@@ -48,7 +50,7 @@ def main():
                                       if "=" in line and not line.startswith("#"))
                     if properties.get("versionNumber") != version:
                         raise ValueError(f"Incorrect runtime identity in {name}: {properties}")
-                    if properties.get("commitId") != "e5ee1df3d88b8ca3a8074787a94f373e3090e1db":
+                    if properties.get("commitId") != target["revision"]:
                         raise ValueError(f"Incorrect source revision in {name}: {properties}")
                     receipts.append(name)
         if not receipts:

@@ -18,6 +18,36 @@ The Gradle-only source history was moved out of the former combined toolchain re
 
 See [NOTICE.md](NOTICE.md) for component source and license coverage.
 
+## Additional version ports in progress
+
+[distribution/targets.json](distribution/targets.json) pins the exact source,
+source-build bootstrap and native dependencies for Gradle 8.11.1, 8.14.3,
+9.3.1, 9.4.1, 9.6.0 and 9.7.1. `targets.py --source <cached-git-repository>`
+audits those immutable source objects without downloading or running Gradle.
+Pins are build inputs, **not additional qualified releases**. The existing
+8.14.3 release remains unchanged while the other ports are built and verified.
+
+The shared native recipe accepts `COMPONENT_PROFILE=8.11`, `8.14` (default) or `9`.
+Profile 9 builds native-platform milestone 29 and file-events 0.2.8 from their
+own exact revisions; Jansi 2.4.2 has a [separate source recipe](jansi/README.md).
+Profile 8.11 preserves milestone 26's integrated file-events component, its
+original package/API and its separate generated native fingerprint. Source
+layout and probe API differences are selected at build time, never by runtime
+fallback. Its recipe is prepared but has not passed compilation/qualification.
+No unsupported profile silently uses another one.
+
+`NATIVE_PLATFORM_GRADLE_HOME` and `FILE_EVENTS_GRADLE_HOME` explicitly reuse an
+already installed exact upstream bootstrap without modifying Wrapper caches.
+`DOWNLOADS_DIR` reuses the checksum-pinned ncurses package; source objects,
+isolated build outputs and dependency caches remain reusable under `.work/`
+or the Gradle work volume. Git ignores those generated files and local Gradle
+caches. Gradle, AGP and NDK source/build ownership is separate.
+
+The builder extends a pinned existing Termux build-image digest and adds only
+missing CMake, Ninja and JDK 25 host tools. It also provides host JDKs 17 and 21.
+Gradle 9.7.1's **source-build daemon** requires JDK 25; this is not a requirement
+imposed on every Android project or its application bytecode.
+
 ## Native components: inputs and build
 
 | Component | Upstream source | Base version |
@@ -42,13 +72,20 @@ docker run --rm \
 
 The standalone builder supplies Linux host JDK 17, CMake and Ninja. Android output uses the external official NDK r29 (`29.0.14206865`), Clang 21, `arm64-v8a`, API 24, static libc++, and 16 KB ELF segment alignment. The selected NDK's system JNI headers define the target JNI ABI. No glibc shim, binary rewriting, fake GNU library name, or disabled native check is involved.
 
-Upstream wrappers perform only Java/header/version generation: file-events uses Gradle 8.10.2 `compileJava`; native-platform uses Gradle 7.5 `writeNativeVersionSources`, followed by host `javac --release 8 -h` over its complete Java sources. Java 8 bytecode is suitable for Gradle 8.14.3; this does not try to reproduce native-platform's historical Java 5/6 targets. These build-tool distributions/cache are isolated under `/work/gradle-native/gradle-home`. Builds use two workers, a 1536 MB Gradle heap, and `--no-scan` to prevent build-scan upload. The build recipes do not publish artifacts.
+Upstream wrappers perform Java/header/version generation with the exact bootstrap
+versions in `targets.json`. The baseline 8.14 profile uses Gradle 8.10.2 for
+file-events and 7.5 for native-platform; profile 9 uses 8.13 and 8.14.3 respectively.
+The integrated 8.11 profile uses one Gradle 7.5 invocation for both upstream
+fingerprint generators. Complete native-platform Java sources are compiled with
+host `javac --release 8 -h`; this does not reproduce historical Java 5/6 targets.
+Build tools/dependencies share `/work/gradle-native/gradle-home`. Builds use two
+workers, a 1536 MB Gradle heap, and `--no-scan`. No recipe publishes artifacts.
 
 Each build prints its fresh `/work/gradle-native/build-*/` directory. `artifacts/` contains three shared libraries, paired source-built Java component JARs with their own Android native resources, Java source JARs, generated version headers, notices, and a dedicated probe bundle. Keeping resources in each component JAR also supports Gradle's isolated test-worker classloader. Those JARs are component outputs, not replacements to copy into stock Gradle.
 
 ## Source adaptations and identity
 
-`native-platform-android.patch` limits the `sys/sysctl.h` include to its actual Apple caller and limits GNU `strerror_r` semantics to glibc. Android Bionic uses the existing POSIX branch. Other native code, including file-events' inotify implementation, is unchanged.
+`native-platform-android.patch` limits GNU `strerror_r` semantics to glibc. Android Bionic uses the existing POSIX branch. The separate `native-platform-28-sysctl.patch` limits the `sys/sysctl.h` include to its actual Apple caller only for milestone 28; milestone 29 already contains upstream's header correction. Other native code, including file-events' inotify implementation, is unchanged.
 
 The native-platform Java companion is explicitly built for Android aarch64. It validates the JVM reports Linux/aarch64 and selects `android-aarch64`, reusing the existing POSIX/Linux kernel implementations. This is build-declared targeting, not a universal Bionic detector, and it never changes `os.name`. `file-events-android.patch` consumes that one identity and maps it to `aarch64-linux-android`. Native resources use exactly those Android names:
 

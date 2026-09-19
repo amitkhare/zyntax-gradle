@@ -29,6 +29,11 @@ relicense upstream work or provide a legal-compliance guarantee.
   license and EPL-1.0 headers/notices on the applicable runtime/native files.
   See [jansi/PORT-NOTICE.txt](jansi/PORT-NOTICE.txt) and
   [the EPL text](jansi/licenses/EPL-1.0.txt).
+- Additional native source ports in preparation: native-platform milestone 29,
+  file-events 0.2.8 and Jansi 2.4.2, all Apache-2.0. Exact component source pins
+  are in [distribution/targets.json](distribution/targets.json) and the
+  [Jansi 2 port notice](jansi/PORT-NOTICE-2.txt). These are not yet qualified
+  Gradle distribution releases. Original notices accompany each source build.
 - NDK r29 is an external build input. Its original notices accompany artifacts
   for linked target runtime code. Ncurses and its terminfo database are external
   app-private terminal dependencies, not redistributed in the Gradle bundle.

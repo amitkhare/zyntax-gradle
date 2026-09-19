@@ -1,0 +1,14 @@
+diff --git a/native-platform/src/main/cpp/posix.cpp b/native-platform/src/main/cpp/posix.cpp
+--- a/native-platform/src/main/cpp/posix.cpp
++++ b/native-platform/src/main/cpp/posix.cpp
+@@ -35,7 +35,10 @@
+ #include <sys/utsname.h>
+ #include <termios.h>
+ #include <unistd.h>
++// Android host port: only the Apple implementation below uses sysctl.
++#ifdef __APPLE__
+ #include <sys/sysctl.h>
++#endif
+ 
+ jmethodID fileStatDetailsMethodId;
+ 

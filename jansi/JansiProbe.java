@@ -1,13 +1,11 @@
 import java.util.Arrays;
-import org.fusesource.hawtjni.runtime.Library;
 import org.fusesource.jansi.internal.CLibrary;
 
 /** Separate Android-only JNI probe. Running this is a device action, not a build step. */
 public final class JansiProbe {
     public static void main(String[] args) {
-        require("android-aarch64".equals(Library.getPlatform()), "Android platform identity");
         require(CLibrary.HAVE_ISATTY && CLibrary.HAVE_TTYNAME, "required native terminal support");
-        require(CLibrary.STDIN_FILENO == 0 && CLibrary.STDOUT_FILENO == 1 && CLibrary.STDERR_FILENO == 2, "native descriptors");
+        require(CLibrary.STDOUT_FILENO == 1 && CLibrary.STDERR_FILENO == 2, "native descriptors");
         require(CLibrary.isatty(0) == 1 && CLibrary.isatty(1) == 1, "probe requires a real PTY");
         CLibrary.WinSize terminal = new CLibrary.WinSize();
         require(CLibrary.ioctl(1, CLibrary.TIOCGWINSZ, terminal) == 0, "terminal window size");

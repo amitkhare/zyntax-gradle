@@ -1,1 +1,3 @@
 * text=auto eol=lf
+# Unified diffs contain mandatory leading context spaces, including empty lines.
+*.patch -whitespace

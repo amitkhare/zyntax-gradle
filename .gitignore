@@ -2,6 +2,8 @@
 /.work/
 /dist/
 /build/
+/.gradle/
+/.kotlin/
 *.deb
 *.tar.*
 *.zip

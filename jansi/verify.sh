@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 stage=${1:?fresh Jansi build directory required}
+api=${2:-1}
+case "$api" in
+    1) version=1.18-zyntax.1; resource=META-INF/native/android-aarch64/libjansi.so ;;
+    2) version=2.4.2-zyntax.1; resource=org/fusesource/jansi/internal/native/Android/arm64/libjansi.so ;;
+    *) printf 'Unsupported Jansi source API: %s\n' "$api" >&2; exit 1 ;;
+esac
 ndk_dir=${NDK_DIR:?Supply the external official r29 NDK directory}
 tools="$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin"
 library="$stage/artifacts/lib/libjansi.so"
-jar_file="$stage/artifacts/java/jansi-1.18-zyntax.1.jar"
+jar_file="$stage/artifacts/java/jansi-$version.jar"
 "$tools/llvm-readelf" -h "$library" | grep -E 'Class:|Type:|Machine:'
 "$tools/llvm-readelf" -h "$library" | grep 'Machine:.*AArch64' >/dev/null
 "$tools/llvm-readelf" -h "$library" | grep 'Type:.*DYN' >/dev/null
@@ -29,9 +35,13 @@ while IFS= read -r symbol; do
     grep -Fx "$symbol" <<< "$exports" >/dev/null || { printf 'Missing JNI export: %s\n' "$symbol" >&2; exit 1; }
 done <<< "$expected"
 test -n "$expected"
-test "$(jar tf "$jar_file" | grep -E '^META-INF/native/.+\.(so|dll|jnilib)$')" = 'META-INF/native/android-aarch64/libjansi.so'
-java -cp "$jar_file:$stage/artifacts/probe/jansi-probe.jar" HostChecks
+test "$(jar tf "$jar_file" | grep -E '\.(so|dll|jnilib|dylib)$')" = "$resource"
+embedded=$(unzip -p "$jar_file" "$resource" | sha256sum | cut -d ' ' -f 1)
+test "$embedded" = "$(sha256sum "$library" | cut -d ' ' -f 1)"
+if [[ $api == 1 ]]; then
+    java -cp "$jar_file:$stage/artifacts/probe/jansi-probe.jar" HostChecks
+fi
 printf 'PASS Android ELF: 16 KB LOAD alignment, dependencies [%s], %s CLibrary JNI exports\n' \
     "$needed" "$(wc -l <<< "$expected")"
-sha256sum "$library" "$jar_file" "$stage/artifacts/java/jansi-1.18-zyntax.1-sources.jar" \
+sha256sum "$library" "$jar_file" "$stage/artifacts/java/jansi-$version-sources.jar" \
     "$stage/artifacts/probe/jansi-probe.jar"

@@ -1,0 +1,110 @@
+diff --git a/src/main/java/org/fusesource/jansi/internal/CLibrary.java b/src/main/java/org/fusesource/jansi/internal/CLibrary.java
+index 2e2285c..347e9cf 100644
+--- a/src/main/java/org/fusesource/jansi/internal/CLibrary.java
++++ b/src/main/java/org/fusesource/jansi/internal/CLibrary.java
+@@ -153,6 +153,8 @@ public class CLibrary {
+         public long c_oflag;
+         public long c_cflag;
+         public long c_lflag;
++        // Android's line-discipline byte is part of a complete termios round trip.
++        public byte c_line;
+         public byte[] c_cc = new byte[32];
+         public long c_ispeed;
+         public long c_ospeed;
+diff --git a/src/main/java/org/fusesource/jansi/internal/OSInfo.java b/src/main/java/org/fusesource/jansi/internal/OSInfo.java
+index 9409656..bfa7a60 100644
+--- a/src/main/java/org/fusesource/jansi/internal/OSInfo.java
++++ b/src/main/java/org/fusesource/jansi/internal/OSInfo.java
+@@ -111,7 +111,12 @@ public class OSInfo {
+     }
+ 
+     public static String getNativeLibFolderPathForCurrentOS() {
+-        return getOSName() + "/" + getArchName();
++        // This source-built companion targets Android ARM64, not desktop Linux.
++        if (!"Linux".equals(System.getProperty("os.name"))
++                || !"aarch64".equals(System.getProperty("os.arch"))) {
++            throw new UnsupportedOperationException("This Jansi build requires Android ARM64");
++        }
++        return "Android/arm64";
+     }
+ 
+     public static String getOSName() {
+diff --git a/src/main/native/jansi.h b/src/main/native/jansi.h
+index cd18c8e..412d7b1 100644
+--- a/src/main/native/jansi.h
++++ b/src/main/native/jansi.h
+@@ -32,7 +32,10 @@
+     #include <stdlib.h>
+ 
+     #include "jni.h"
++    // The Android NDK supplies the target JNI ABI directly in jni.h.
++    #ifndef __ANDROID__
+     #include "jni_md.h"
++    #endif
+ #endif
+ 
+ #ifdef __FreeBSD__
+diff --git a/src/main/native/jansi_structs.c b/src/main/native/jansi_structs.c
+index b04276d..f2e2392 100644
+--- a/src/main/native/jansi_structs.c
++++ b/src/main/native/jansi_structs.c
+@@ -20,7 +20,7 @@
+ typedef struct Termios_FID_CACHE {
+ 	int cached;
+ 	jclass clazz;
+-	jfieldID c_iflag, c_oflag, c_cflag, c_lflag, c_cc, c_ispeed, c_ospeed;
++	jfieldID c_iflag, c_oflag, c_cflag, c_lflag, c_line, c_cc, c_ispeed, c_ospeed;
+ } Termios_FID_CACHE;
+ 
+ Termios_FID_CACHE TermiosFc;
+@@ -33,6 +33,7 @@ void cacheTermiosFields(JNIEnv *env, jobject lpObject)
+ 	TermiosFc.c_oflag = (*env)->GetFieldID(env, TermiosFc.clazz, "c_oflag", "J");
+ 	TermiosFc.c_cflag = (*env)->GetFieldID(env, TermiosFc.clazz, "c_cflag", "J");
+ 	TermiosFc.c_lflag = (*env)->GetFieldID(env, TermiosFc.clazz, "c_lflag", "J");
++	TermiosFc.c_line = (*env)->GetFieldID(env, TermiosFc.clazz, "c_line", "B");
+ 	TermiosFc.c_cc = (*env)->GetFieldID(env, TermiosFc.clazz, "c_cc", "[B");
+ 	TermiosFc.c_ispeed = (*env)->GetFieldID(env, TermiosFc.clazz, "c_ispeed", "J");
+ 	TermiosFc.c_ospeed = (*env)->GetFieldID(env, TermiosFc.clazz, "c_ospeed", "J");
+@@ -54,6 +55,7 @@ struct termios *getTermiosFields(JNIEnv *env, jobject lpObject, struct termios *
+ #endif
+ #if defined(HAVE_IOCTL)
+ 	lpStruct->c_lflag = (*env)->GetLongField(env, lpObject, TermiosFc.c_lflag);
++	lpStruct->c_line = (*env)->GetByteField(env, lpObject, TermiosFc.c_line);
+ #endif
+ #if defined(HAVE_IOCTL)
+ 	{
+@@ -62,10 +64,11 @@ struct termios *getTermiosFields(JNIEnv *env, jobject lpObject, struct termios *
+ 	}
+ #endif
+ #if defined(HAVE_IOCTL)
+-	lpStruct->c_ispeed = (*env)->GetLongField(env, lpObject, TermiosFc.c_ispeed);
++	// Bionic stores baud rates in flags; use its public POSIX accessors.
++	cfsetispeed(lpStruct, (*env)->GetLongField(env, lpObject, TermiosFc.c_ispeed));
+ #endif
+ #if defined(HAVE_IOCTL)
+-	lpStruct->c_ospeed = (*env)->GetLongField(env, lpObject, TermiosFc.c_ospeed);
++	cfsetospeed(lpStruct, (*env)->GetLongField(env, lpObject, TermiosFc.c_ospeed));
+ #endif
+ 	return lpStruct;
+ }
+@@ -84,6 +87,7 @@ void setTermiosFields(JNIEnv *env, jobject lpObject, struct termios *lpStruct)
+ #endif
+ #if defined(HAVE_IOCTL)
+ 	(*env)->SetLongField(env, lpObject, TermiosFc.c_lflag, (jlong)lpStruct->c_lflag);
++	(*env)->SetByteField(env, lpObject, TermiosFc.c_line, (jbyte)lpStruct->c_line);
+ #endif
+ #if defined(HAVE_IOCTL)
+ 	{
+@@ -92,10 +96,10 @@ void setTermiosFields(JNIEnv *env, jobject lpObject, struct termios *lpStruct)
+ 	}
+ #endif
+ #if defined(HAVE_IOCTL)
+-	(*env)->SetLongField(env, lpObject, TermiosFc.c_ispeed, (jlong)lpStruct->c_ispeed);
++	(*env)->SetLongField(env, lpObject, TermiosFc.c_ispeed, (jlong)cfgetispeed(lpStruct));
+ #endif
+ #if defined(HAVE_IOCTL)
+-	(*env)->SetLongField(env, lpObject, TermiosFc.c_ospeed, (jlong)lpStruct->c_ospeed);
++	(*env)->SetLongField(env, lpObject, TermiosFc.c_ospeed, (jlong)cfgetospeed(lpStruct));
+ #endif
+ }
+ #endif

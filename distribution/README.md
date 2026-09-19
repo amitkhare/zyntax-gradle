@@ -8,6 +8,29 @@ scope and remaining limitations are below.
 Nothing here modifies an installed Gradle, its extraction cache, a project's
 wrapper, or app/SDK source.
 
+## Additional exact source targets
+
+`targets.json` also records prepared, **unqualified** source recipes for 8.11.1, 9.3.1,
+9.4.1, 9.6.0 and 9.7.1. Select an exact target with `GRADLE_VERSION`; 8.14.3
+remains the default. Each uses one shared Gradle 9 file-watching patch plus a
+small version-specific dependency/packaging patch. Upstream changes such as
+9.7's probe-file cleanup are retained. The 8.11.1 recipe uses milestone 26's
+original file-events module/API and retains its original watch-logging contract.
+Its native component compilation remains pending; no version is substituted.
+
+The recipe reads source/bootstrap pins and component versions from the manifest.
+It combines only the declared patch series, validates the cached commit rather
+than requiring that cache's HEAD to change, and records the exact target and
+combined patch in the output notices. Source-input and strict dependency
+verification remain enabled. New target names do not imply published support.
+The shared Gradle 9 native components and Jansi 2.4.2 have passed source compilation
+and host ELF/JNI checks; complete Gradle 9 distribution/runtime checks remain pending.
+
+Build dependency caches are shared across these serial source builds at
+`/work/gradle-native/gradle-home`; `BUILD_GRADLE_USER_HOME` can select another
+explicit build cache. Per-target source/output directories and timestamps remain
+separate. Already downloaded tools are reused, not downloaded per target.
+
 Build the standalone `zyntax-gradle-native-builder` image from the repository-root
 Dockerfile (Bash entrypoint, host JDK 17) and use the independent
 `zyntax-gradle-work` volume. Supply completed, verified component artifact
@@ -16,8 +39,8 @@ builds consume an externally supplied NDK r29; distribution assembly does not
 require an NDK repository, image or filesystem.
 
 Prepare the exact [upstream Gradle Git revision](https://github.com/gradle/gradle/tree/e5ee1df3d88b8ca3a8074787a94f373e3090e1db)
-at `/work/gradle-native/gradle` inside that volume; its Git objects and HEAD are
-the source input. `SOURCE_INPUT` explicitly selects this exact checkout.
+at `/work/gradle-native/gradle` inside that volume; the pinned Git objects are
+the source input. `SOURCE_INPUT` selects that cache without changing its HEAD.
 Set `NATIVE_ARTIFACTS` and `JANSI_ARTIFACTS` to the artifact directories printed
 by your completed component builds, not historical build-directory names.
 
@@ -32,7 +55,7 @@ docker run --rm \
 `prepare` as the script argument only clones and patches the source. A fresh
 Linux checkout lives under
 `/work/gradle-native/distribution/8.14.3-android.1/source`. Rerunning the command
-resumes that stage with its own Gradle user home and recorded timestamp. Changed
+resumes that stage with the shared build cache and its recorded timestamp. Changed
 patch/component inputs require a fresh `WORK_DIR` under that distribution directory.
 No old stage is deleted automatically.
 Before compilation, a temporary Git index/object store reconstructs the pinned
@@ -47,9 +70,10 @@ Upstream's build wrapper is Gradle 8.14.2. Its binary ZIP SHA-256 is pinned to
 `7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999`, verified from
 the [official checksum](https://services.gradle.org/distributions/gradle-8.14.2-bin.zip.sha256).
 The source wrapper receives that checksum before execution. Build limits are two
-workers and a 2 GB Gradle heap; build scans, configuration cache and build cache
-are disabled. Resumes reuse only that stage's locally compiled task outputs and
-downloads. `RERUN_TASKS=true` requests a full local task rebuild when needed.
+workers and a 2 GB Gradle heap; build scans and build cache are disabled.
+Configuration cache follows the exact upstream build's settings, including the
+Isolated Projects requirement in 9.7. Resumes reuse locally compiled task outputs and the
+shared downloaded dependencies. `RERUN_TASKS=true` requests a full local task rebuild when needed.
 The restricted repository uses one required, recipe-exported
 `ZYNTAX_GRADLE_COMPONENTS_REPOSITORY` environment provider, including in Gradle's
 synthetic precompiled-plugin accessor projects, which do not inherit command-line

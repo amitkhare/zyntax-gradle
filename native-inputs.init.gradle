@@ -1,0 +1,18 @@
+// Export Gradle-resolved host compile inputs; never search or mutate cache internals.
+gradle.afterProject { project ->
+    def component = project.findProperty('androidCompileProject') ?: ':'
+    if (project.path == component) {
+        project.tasks.register('exportAndroidCompileInputs', Copy) {
+            def inputs = (project.findProperty('androidCompileInputs') ?:
+                'jsr305-3.0.2.jar,slf4j-api-1.7.36.jar').split(',') as Set
+            from({ project.configurations.compileClasspath.filter { inputs.contains(it.name) } })
+            into(project.layout.buildDirectory.dir('android-compile-inputs'))
+            doLast {
+                def actual = destinationDir.listFiles().collect { it.name } as Set
+                if (actual != inputs) {
+                    throw new GradleException("Unexpected Android source compile inputs: ${actual}")
+                }
+            }
+        }
+    }
+}

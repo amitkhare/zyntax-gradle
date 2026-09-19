@@ -1,0 +1,1540 @@
+diff --git a/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts b/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts
+index 18390a554..611b9b90e 100644
+--- a/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts
++++ b/build-logic-commons/gradle-plugin/src/main/kotlin/gradlebuild.repositories.gradle.kts
+@@ -15,6 +15,16 @@
+  */
+ 
+ repositories {
++    // Android-host components have their own coordinates and strict checksums.
++    exclusiveContent {
++        forRepository {
++            maven {
++                name = "Android Gradle components"
++                url = uri(providers.environmentVariable("ZYNTAX_GRADLE_COMPONENTS_REPOSITORY").get())
++            }
++        }
++        filter { includeGroup("app.zyntax.gradle") }
++    }
+     maven {
+         name = "Gradle public repository"
+         url = uri("https://repo.gradle.org/gradle/public")
+diff --git a/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts b/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts
+index 5baf33367..40a76f978 100644
+--- a/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts
++++ b/build-logic/dependency-modules/src/main/kotlin/gradlebuild.dependency-modules.gradle.kts
+@@ -23,2 +23,7 @@
+ applyAutomaticUpgradeOfCapabilities()
++dependencies.modules {
++    module("org.fusesource.jansi:jansi") {
++        replacedBy("app.zyntax.gradle:jansi", "Android host source-built Jansi 2.4.2")
++    }
++}
+ dependencies {
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherRegistry.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherRegistry.java
+index 2830e4e43..8edc376d4 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherRegistry.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherRegistry.java
+@@ -19,15 +19,15 @@
+ import org.gradle.internal.snapshot.FileSystemLocationSnapshot;
+ import org.gradle.internal.snapshot.SnapshotHierarchy;
+ import org.gradle.internal.watch.WatchingNotSupportedException;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ 
+-import javax.annotation.CheckReturnValue;
+ import java.io.Closeable;
+ import java.io.File;
+ import java.io.IOException;
+ import java.nio.file.Path;
+ import java.util.Collection;
+-import java.util.List;
+ import java.util.Optional;
++import javax.annotation.CheckReturnValue;
+ 
+ public interface FileWatcherRegistry extends Closeable {
+ 
+@@ -69,7 +69,7 @@ enum Type {
+      * For example, this method checks if watched hierarchies are where we left them after the previous build.
+      */
+     @CheckReturnValue
+-    SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, List<File> unsupportedFileSystems);
++    SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, WatchableFileSystems watchableFileSystems);
+ 
+     /**
+      * Updates the VFS and the watchers before the build finishes.
+@@ -80,7 +80,7 @@ enum Type {
+      * @return the snapshot hierarchy without snapshots which can't be kept till the next build.
+      */
+     @CheckReturnValue
+-    SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, List<File> unsupportedFileSystems);
++    SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, WatchableFileSystems watchableFileSystems);
+ 
+     /**
+      * Updates the VFS and the watchers after the build finished.
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherUpdater.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherUpdater.java
+index 58cc4580c..3f43a90dd 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherUpdater.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/FileWatcherUpdater.java
+@@ -19,11 +19,11 @@
+ import org.gradle.internal.file.FileHierarchySet;
+ import org.gradle.internal.snapshot.FileSystemLocationSnapshot;
+ import org.gradle.internal.snapshot.SnapshotHierarchy;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ 
+-import javax.annotation.CheckReturnValue;
+ import java.io.File;
+ import java.util.Collection;
+-import java.util.List;
++import javax.annotation.CheckReturnValue;
+ 
+ /**
+  * <p>
+@@ -93,23 +93,23 @@ public interface FileWatcherUpdater {
+     /**
+      * Remove watched hierarchies that have been moved.
+      *
+-     * @see FileWatcherRegistry#updateVfsOnBuildStarted(SnapshotHierarchy, WatchMode, java.util.List)
++     * @see FileWatcherRegistry#updateVfsOnBuildStarted(SnapshotHierarchy, WatchMode, WatchableFileSystems)
+      */
+     @CheckReturnValue
+-    SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, List<File> unsupportedFileSystems);
++    SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, WatchableFileSystems watchableFileSystems);
+ 
+     /**
+      * Remove everything from the root which can't be kept after the current build finished.
+      *
+-     * @see FileWatcherRegistry#updateVfsBeforeBuildFinished(SnapshotHierarchy, int, List)
++     * @see FileWatcherRegistry#updateVfsBeforeBuildFinished(SnapshotHierarchy, int, WatchableFileSystems)
+      */
+     @CheckReturnValue
+-    SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, List<File> unsupportedFileSystems);
++    SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, WatchableFileSystems watchableFileSystems);
+ 
+     /**
+      * Remove everything from the root which can't be kept after the current build finished.
+      *
+-     * @see FileWatcherRegistry#updateVfsBeforeBuildFinished(SnapshotHierarchy, int, List)
++     * @see FileWatcherRegistry#updateVfsBeforeBuildFinished(SnapshotHierarchy, int, WatchableFileSystems)
+      */
+     @CheckReturnValue
+     SnapshotHierarchy updateVfsBeforeAfterFinished(SnapshotHierarchy root);
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdater.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdater.java
+index 2ff8fbb91..b9a142f7f 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdater.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdater.java
+@@ -27,14 +27,14 @@
+ import org.gradle.internal.watch.registry.FileWatcherProbeRegistry;
+ import org.gradle.internal.watch.registry.FileWatcherUpdater;
+ import org.gradle.internal.watch.registry.WatchMode;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import javax.annotation.CheckReturnValue;
+ import java.io.File;
+ import java.util.Collection;
+-import java.util.List;
+ import java.util.stream.Stream;
++import javax.annotation.CheckReturnValue;
+ 
+ public abstract class AbstractFileWatcherUpdater implements FileWatcherUpdater {
+     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractFileWatcherUpdater.class);
+@@ -63,8 +63,8 @@ public void registerWatchableHierarchy(File watchableHierarchy, SnapshotHierarch
+     }
+ 
+     @Override
+-    public final SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, List<File> unsupportedFileSystems) {
+-        SnapshotHierarchy newRoot = watchableHierarchies.removeUnwatchableContentOnBuildStart(root, createInvalidator(), watchMode, unsupportedFileSystems);
++    public final SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, WatchableFileSystems watchableFileSystems) {
++        SnapshotHierarchy newRoot = watchableHierarchies.removeUnwatchableContentOnBuildStart(root, createInvalidator(), watchMode, watchableFileSystems);
+         newRoot = invalidateMovedDirectoriesOnBuildStarted(newRoot);
+         if (root != newRoot) {
+             update(newRoot);
+@@ -94,12 +94,12 @@ public void virtualFileSystemContentsChanged(Collection<FileSystemLocationSnapsh
+     protected abstract boolean handleVirtualFileSystemContentsChanged(Collection<FileSystemLocationSnapshot> removedSnapshots, Collection<FileSystemLocationSnapshot> addedSnapshots, SnapshotHierarchy root);
+ 
+     @Override
+-    public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, List<File> unsupportedFileSystems) {
++    public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, WatchableFileSystems watchableFileSystems) {
+         SnapshotHierarchy newRoot = watchableHierarchies.removeUnwatchableContentBeforeBuildFinished(
+             root,
+             watchedFiles::contains,
+             maximumNumberOfWatchedHierarchies,
+-            unsupportedFileSystems,
++            watchableFileSystems,
+             createInvalidator()
+         );
+ 
+@@ -111,7 +111,7 @@ public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, in
+ 
+     @Override
+     public SnapshotHierarchy updateVfsBeforeAfterFinished(SnapshotHierarchy root) {
+-        SnapshotHierarchy newRoot = WatchableHierarchies.removeUnwatchableContentAfterBuildFinished(
++        SnapshotHierarchy newRoot = watchableHierarchies.removeUnwatchableContentAfterBuildFinished(
+             root,
+             createInvalidator()
+         );
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdater.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdater.java
+index 7b7dcbbe5..724552750 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdater.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdater.java
+@@ -24,6 +24,7 @@
+ import org.gradle.internal.snapshot.SnapshotHierarchy;
+ import org.gradle.internal.watch.registry.FileWatcherProbeRegistry;
+ import org.gradle.internal.watch.registry.FileWatcherUpdater;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+@@ -87,8 +88,8 @@ protected boolean handleVirtualFileSystemContentsChanged(Collection<FileSystemLo
+     }
+ 
+     @Override
+-    public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, List<File> unsupportedFileSystems) {
+-        SnapshotHierarchy newRoot = super.updateVfsBeforeBuildFinished(root, maximumNumberOfWatchedHierarchies, unsupportedFileSystems);
++    public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, WatchableFileSystems watchableFileSystems) {
++        SnapshotHierarchy newRoot = super.updateVfsBeforeBuildFinished(root, maximumNumberOfWatchedHierarchies, watchableFileSystems);
+         LOGGER.info("Watched directory hierarchies: {}", watchedHierarchies);
+         return newRoot;
+     }
+@@ -136,7 +137,7 @@ protected void stopWatchingProbeDirectory(File probeDirectory) {
+ 
+     @Override
+     protected WatchableHierarchies.Invalidator createInvalidator() {
+-        return (location, currentRoot) -> currentRoot.invalidate(location, SnapshotHierarchy.NodeDiffListener.NOOP);
++        return (currentRoot, action) -> action.apply(currentRoot, SnapshotHierarchy.NodeDiffListener.NOOP);
+     }
+ 
+     public interface FileSystemLocationToWatchValidator {
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdater.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdater.java
+index bdd06ae9a..8206fb4f8 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdater.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdater.java
+@@ -112,9 +112,9 @@ protected void updateWatchesOnChangedWatchedFiles(FileHierarchySet newWatchedFil
+ 
+     @Override
+     protected WatchableHierarchies.Invalidator createInvalidator() {
+-        return (location, currentRoot) -> {
++        return (currentRoot, action) -> {
+             SnapshotCollectingDiffListener diffListener = new SnapshotCollectingDiffListener();
+-            SnapshotHierarchy invalidatedRoot = currentRoot.invalidate(location, diffListener);
++            SnapshotHierarchy invalidatedRoot = action.apply(currentRoot, diffListener);
+             diffListener.publishSnapshotDiff((removedSnapshots, addedSnapshots) -> virtualFileSystemContentsChanged(removedSnapshots, addedSnapshots, invalidatedRoot));
+             return invalidatedRoot;
+         };
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/WatchableHierarchies.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/WatchableHierarchies.java
+index 8f2305479..eb045df3b 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/WatchableHierarchies.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/WatchableHierarchies.java
+@@ -18,16 +18,17 @@
+ 
+ import org.gradle.internal.file.FileHierarchySet;
+ import org.gradle.internal.file.FileMetadata;
++import org.gradle.internal.snapshot.DirectorySnapshot;
+ import org.gradle.internal.snapshot.FileSystemLocationSnapshot;
+ import org.gradle.internal.snapshot.FileSystemSnapshotHierarchyVisitor;
+ import org.gradle.internal.snapshot.SnapshotHierarchy;
+ import org.gradle.internal.snapshot.SnapshotVisitResult;
+ import org.gradle.internal.watch.registry.FileWatcherProbeRegistry;
+ import org.gradle.internal.watch.registry.WatchMode;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import javax.annotation.CheckReturnValue;
+ import java.io.File;
+ import java.nio.file.Files;
+ import java.util.ArrayDeque;
+@@ -37,8 +38,10 @@
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
++import java.util.function.BiFunction;
+ import java.util.function.Predicate;
+ import java.util.stream.Stream;
++import javax.annotation.CheckReturnValue;
+ 
+ import static org.gradle.internal.Combiners.nonCombining;
+ 
+@@ -58,11 +61,9 @@ public class WatchableHierarchies {
+     private FileHierarchySet watchableFiles = FileHierarchySet.empty();
+ 
+     /**
+-     * Files in locations that do not support watching.
+-     *
+-     * Those are the mount points of file systems that do not support watching.
++     * Watching support at the nearest mounted file system, including nested mounts.
+      */
+-    private FileHierarchySet unwatchableFiles = FileHierarchySet.empty();
++    private WatchableFileSystems watchableFileSystems = WatchableFileSystems.UNRESTRICTED;
+ 
+     /**
+      * Hierarchies in usage order, most recent first.
+@@ -87,7 +88,7 @@ public void registerWatchableHierarchy(File watchableHierarchy, SnapshotHierarch
+             ));
+         }
+         watchableHierarchiesSinceLastBuildFinish.add(watchableHierarchy);
+-        if (unwatchableFiles.contains(watchableHierarchyPath)) {
++        if (!watchableFileSystems.isSupported(watchableHierarchyPath)) {
+             LOGGER.info("Not watching {} since the file system is not supported", watchableHierarchy);
+             return;
+         }
+@@ -112,13 +113,13 @@ public SnapshotHierarchy removeUnwatchableContentBeforeBuildFinished(
+         SnapshotHierarchy root,
+         Predicate<File> isWatchedHierarchy,
+         int maximumNumberOfWatchedHierarchies,
+-        List<File> unsupportedFileSystems,
++        WatchableFileSystems watchableFileSystems,
+         Invalidator invalidator
+     ) {
+         SnapshotHierarchy newRoot = root;
+         newRoot = removeWatchedHierarchiesOverLimit(newRoot, isWatchedHierarchy, maximumNumberOfWatchedHierarchies, invalidator);
+-        newRoot = removeUnwatchableFileSystems(newRoot, unsupportedFileSystems, invalidator);
+         newRoot = removeUnwatchedSnapshots(newRoot, invalidator);
++        newRoot = removeUnwatchableFileSystems(newRoot, watchableFileSystems, invalidator);
+         watchableHierarchiesSinceLastBuildFinish.clear();
+         return newRoot;
+     }
+@@ -138,12 +139,12 @@ private SnapshotHierarchy removeUnwatchedSnapshots(SnapshotHierarchy newRoot, In
+     }
+ 
+     @CheckReturnValue
+-    public static SnapshotHierarchy removeUnwatchableContentAfterBuildFinished(SnapshotHierarchy root, Invalidator invalidator) {
++    public SnapshotHierarchy removeUnwatchableContentAfterBuildFinished(SnapshotHierarchy root, Invalidator invalidator) {
+         SnapshotHierarchy newRoot = root;
+         // We are not being notified about changes to content accessed via symlinks
+         newRoot = removeIndirectlySymlinkedRoots(newRoot, invalidator);
+         newRoot = removeDirectSymlinks(newRoot, invalidator);
+-        return newRoot;
++        return removeUnwatchableFileSystems(newRoot, watchableFileSystems, invalidator);
+     }
+ 
+     @CheckReturnValue
+@@ -200,18 +201,24 @@ private static FileHierarchySet buildWatchableFilesFromHierarchies(Collection<Fi
+     }
+ 
+     @CheckReturnValue
+-    private static SnapshotHierarchy removeUnwatchableFileSystems(SnapshotHierarchy root, List<File> unsupportedFileSystems, Invalidator invalidator) {
+-        if (unsupportedFileSystems.isEmpty()) {
++    private static SnapshotHierarchy removeUnwatchableFileSystems(SnapshotHierarchy root, WatchableFileSystems fileSystems, Invalidator invalidator) {
++        if (fileSystems.isUnrestricted()) {
+             return root;
+         }
+ 
+-        SnapshotHierarchy invalidatedRoot = unsupportedFileSystems.stream()
+-            .reduce(
+-                root,
+-                (updatedRoot, fileSystem) -> invalidator.invalidate(fileSystem.getAbsolutePath(), updatedRoot),
+-                nonCombining()
+-            );
+-        if (invalidatedRoot != root) {
++        SupportedSnapshotsVisitor visitor = new SupportedSnapshotsVisitor(fileSystems);
++        root.rootSnapshots().forEach(snapshot -> snapshot.accept(visitor));
++        SnapshotHierarchy invalidatedRoot = invalidator.update(root, (currentRoot, diffListener) -> {
++            currentRoot.rootSnapshots().forEach(diffListener::nodeRemoved);
++            // Also drop metadata-only nodes, which rootSnapshots() cannot enumerate.
++            // Keep original snapshots, never a complete hash of filtered directory contents.
++            SnapshotHierarchy updatedRoot = currentRoot.empty();
++            for (FileSystemLocationSnapshot retained : visitor.retained) {
++                updatedRoot = updatedRoot.store(retained.getAbsolutePath(), retained, diffListener);
++            }
++            return updatedRoot;
++        });
++        if (visitor.excludedContent) {
+             LOGGER.info("Some of the file system contents retained in the virtual file system are on file systems that Gradle doesn't support watching. " +
+                 "The relevant state was discarded to ensure changes to these locations are properly detected. " +
+                 "You can override this by explicitly enabling file system watching.");
+@@ -220,10 +227,10 @@ private static SnapshotHierarchy removeUnwatchableFileSystems(SnapshotHierarchy
+     }
+ 
+     @CheckReturnValue
+-    public SnapshotHierarchy removeUnwatchableContentOnBuildStart(SnapshotHierarchy root, Invalidator invalidator, WatchMode watchMode, List<File> unsupportedFileSystems) {
++    public SnapshotHierarchy removeUnwatchableContentOnBuildStart(SnapshotHierarchy root, Invalidator invalidator, WatchMode watchMode, WatchableFileSystems fileSystems) {
+         SnapshotHierarchy newRoot = root;
+         newRoot = removeUnprovenHierarchies(newRoot, invalidator, watchMode);
+-        newRoot = updateUnwatchableFilesOnBuildStart(newRoot, invalidator, unsupportedFileSystems);
++        newRoot = updateUnwatchableFilesOnBuildStart(newRoot, invalidator, fileSystems);
+         return newRoot;
+     }
+ 
+@@ -242,24 +249,29 @@ private SnapshotHierarchy removeUnprovenHierarchies(SnapshotHierarchy root, Inva
+     }
+ 
+     @CheckReturnValue
+-    private SnapshotHierarchy updateUnwatchableFilesOnBuildStart(SnapshotHierarchy root, Invalidator invalidator, List<File> unsupportedFileSystems) {
++    private SnapshotHierarchy updateUnwatchableFilesOnBuildStart(SnapshotHierarchy root, Invalidator invalidator, WatchableFileSystems fileSystems) {
+         SnapshotHierarchy newRoot = root;
+-        FileHierarchySet oldUnwatchableFiles = unwatchableFiles;
+-        unwatchableFiles = unsupportedFileSystems.stream()
+-            .reduce(FileHierarchySet.empty(), FileHierarchySet::plus, nonCombining());
+-        if (!oldUnwatchableFiles.equals(unwatchableFiles)) {
+-            // Remove previously unwatchable files, since they may become watchable.
+-            // If we register a watchable hierarchy, then there mustn't be anything in the VFS at that location.
+-            newRoot = invalidateUnwatchableHierarchies(newRoot, invalidator, oldUnwatchableFiles);
+-            // Remove current unwatchable files, since they still may be watched.
+-            newRoot = invalidateUnwatchableHierarchies(newRoot, invalidator, unwatchableFiles);
+-
+-            hierarchies.removeIf(unwatchableFiles::contains);
++        boolean modeChanged = watchableFileSystems.isUnrestricted() != fileSystems.isUnrestricted();
++        FileHierarchySet changedMounts = modeChanged ? FileHierarchySet.empty() : fileSystems.changedMountPointsSince(watchableFileSystems);
++        if (modeChanged || !changedMounts.isEmpty()) {
++            // Consume old watcher accounting before changing hierarchy eligibility.
++            InvalidatingRootVisitor visitor = new InvalidatingRootVisitor(root, invalidator);
++            if (modeChanged) {
++                newRoot = invalidator.update(root, (currentRoot, diffListener) -> {
++                    currentRoot.rootSnapshots().forEach(diffListener::nodeRemoved);
++                    return currentRoot.empty();
++                });
++            } else {
++                changedMounts.visitRoots(visitor);
++                newRoot = visitor.getNewRoot();
++            }
++            watchableFileSystems = fileSystems;
++            hierarchies.removeIf(hierarchy -> !fileSystems.isSupported(hierarchy.getAbsolutePath()));
+             watchableFiles = buildWatchableFilesFromHierarchies(hierarchies);
+ 
+             // Replay the watchable hierarchies since the end of last build, since they have become watchable.
+             for (File watchableHierarchy : watchableHierarchiesSinceLastBuildFinish) {
+-                if (!unwatchableFiles.contains(watchableHierarchy)) {
++                if (fileSystems.isSupported(watchableHierarchy.getAbsolutePath())) {
+                     doRegisterWatchableHierarchy(watchableHierarchy, newRoot);
+                 }
+             }
+@@ -267,13 +279,6 @@ private SnapshotHierarchy updateUnwatchableFilesOnBuildStart(SnapshotHierarchy r
+         return newRoot;
+     }
+ 
+-    @CheckReturnValue
+-    private static SnapshotHierarchy invalidateUnwatchableHierarchies(SnapshotHierarchy root, Invalidator invalidator, FileHierarchySet unwatchableFiles) {
+-        InvalidatingRootVisitor invalidatingRootVisitor = new InvalidatingRootVisitor(root, invalidator);
+-        unwatchableFiles.visitRoots(invalidatingRootVisitor);
+-        return invalidatingRootVisitor.getNewRoot();
+-    }
+-
+     /**
+      * Hierarchies in usage order, most recent first.
+      */
+@@ -355,8 +360,71 @@ public SnapshotVisitResult visitEntry(FileSystemLocationSnapshot snapshot) {
+         }
+     }
+ 
++    private static class SupportedSnapshotsVisitor implements FileSystemSnapshotHierarchyVisitor {
++        private final WatchableFileSystems fileSystems;
++        private final Deque<RetainedDirectory> directories = new ArrayDeque<>();
++        private final List<FileSystemLocationSnapshot> retained = new ArrayList<>();
++        private boolean excludedContent;
++
++        SupportedSnapshotsVisitor(WatchableFileSystems fileSystems) {
++            this.fileSystems = fileSystems;
++        }
++
++        @Override
++        public SnapshotVisitResult visitEntry(FileSystemLocationSnapshot snapshot) {
++            if (!(snapshot instanceof DirectorySnapshot)) {
++                if (fileSystems.isSupported(snapshot.getAbsolutePath())) {
++                    retain(snapshot);
++                } else {
++                    excludedContent = true;
++                    if (!directories.isEmpty()) {
++                        directories.peek().complete = false;
++                    }
++                }
++            }
++            return SnapshotVisitResult.CONTINUE;
++        }
++
++        @Override
++        public void enterDirectory(DirectorySnapshot snapshot) {
++            boolean supported = fileSystems.isSupported(snapshot.getAbsolutePath());
++            excludedContent |= !supported;
++            directories.push(new RetainedDirectory(supported));
++        }
++
++        @Override
++        public void leaveDirectory(DirectorySnapshot snapshot) {
++            RetainedDirectory directory = directories.pop();
++            if (directory.complete) {
++                retain(snapshot);
++            } else if (directories.isEmpty()) {
++                retained.addAll(directory.children);
++            } else {
++                directories.peek().complete = false;
++                directories.peek().children.addAll(directory.children);
++            }
++        }
++
++        private void retain(FileSystemLocationSnapshot snapshot) {
++            (directories.isEmpty() ? retained : directories.peek().children).add(snapshot);
++        }
++
++        private static class RetainedDirectory {
++            private boolean complete;
++            private final List<FileSystemLocationSnapshot> children = new ArrayList<>();
++
++            RetainedDirectory(boolean complete) {
++                this.complete = complete;
++            }
++        }
++    }
++
+     public interface Invalidator {
+-        SnapshotHierarchy invalidate(String absolutePath, SnapshotHierarchy currentRoot);
++        SnapshotHierarchy update(SnapshotHierarchy currentRoot, BiFunction<SnapshotHierarchy, SnapshotHierarchy.NodeDiffListener, SnapshotHierarchy> action);
++
++        default SnapshotHierarchy invalidate(String absolutePath, SnapshotHierarchy currentRoot) {
++            return update(currentRoot, (root, diffListener) -> root.invalidate(absolutePath, diffListener));
++        }
+     }
+ 
+ }
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystemDetector.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystemDetector.java
+index 13c9a6831..9677c79b9 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystemDetector.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystemDetector.java
+@@ -19,13 +19,10 @@
+ import org.gradle.internal.service.scopes.Scope;
+ import org.gradle.internal.service.scopes.ServiceScope;
+ 
+-import java.io.File;
+-import java.util.stream.Stream;
+-
+ @ServiceScope(Scope.UserHome.class)
+ public interface WatchableFileSystemDetector {
+     /**
+-     * Returns the mount points of all file systems for which file system watching is not supported.
++     * Returns the file system watching policy for the current mount table.
+      */
+-    Stream<File> detectUnsupportedFileSystems();
++    WatchableFileSystems detectFileSystems();
+ }
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystems.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystems.java
+new file mode 100644
+index 000000000..da6e8b5ac
+--- /dev/null
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/WatchableFileSystems.java
+@@ -0,0 +1,125 @@
++/*
++ * Copyright 2026 the original author or authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.gradle.internal.watch.vfs;
++
++import net.rubygrapefruit.platform.NativeException;
++import net.rubygrapefruit.platform.file.FileSystemInfo;
++import org.gradle.internal.file.FileHierarchySet;
++
++import java.nio.file.Path;
++import java.nio.file.Paths;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Map;
++import java.util.Objects;
++import java.util.Set;
++import java.util.function.Predicate;
++
++/**
++ * A mount-table snapshot whose most-specific mount determines whether a path supports watching.
++ * Ambiguous mounts exclude their entire subtree, including uniquely listed nested mounts.
++ */
++public final class WatchableFileSystems {
++    public static final WatchableFileSystems UNRESTRICTED = new WatchableFileSystems(Collections.emptyMap(), Collections.emptySet(), fileSystem -> true, true);
++
++    private final Map<Path, FileSystemInfo> fileSystems;
++    private final Set<Path> ambiguousMountPoints;
++    private final Predicate<FileSystemInfo> supported;
++    private final boolean unrestricted;
++
++    private WatchableFileSystems(Map<Path, FileSystemInfo> fileSystems, Set<Path> ambiguousMountPoints, Predicate<FileSystemInfo> supported, boolean unrestricted) {
++        this.fileSystems = Collections.unmodifiableMap(fileSystems);
++        this.ambiguousMountPoints = Collections.unmodifiableSet(ambiguousMountPoints);
++        this.supported = supported;
++        this.unrestricted = unrestricted;
++    }
++
++    public static WatchableFileSystems detect(List<FileSystemInfo> fileSystems, Predicate<FileSystemInfo> supported) {
++        Map<Path, FileSystemInfo> mounts = new HashMap<>();
++        Set<Path> ambiguousMountPoints = new HashSet<>();
++        for (FileSystemInfo fileSystem : fileSystems) {
++            Path mountPoint = fileSystem.getMountPoint().toPath();
++            if (!mountPoint.isAbsolute()) {
++                throw new NativeException("File system mount point is not absolute: " + mountPoint);
++            }
++            Path normalizedMountPoint = mountPoint.normalize();
++            if (ambiguousMountPoints.contains(normalizedMountPoint)) {
++                continue;
++            }
++            if (mounts.putIfAbsent(normalizedMountPoint, fileSystem) != null) {
++                mounts.remove(normalizedMountPoint);
++                ambiguousMountPoints.add(normalizedMountPoint);
++            }
++        }
++        return new WatchableFileSystems(mounts, ambiguousMountPoints, supported, false);
++    }
++
++    public boolean isUnrestricted() {
++        return unrestricted;
++    }
++
++    public boolean isSupported(String absolutePath) {
++        Path path = Paths.get(absolutePath);
++        if (!path.isAbsolute()) {
++            throw new IllegalArgumentException("File system location is not absolute: " + absolutePath);
++        }
++        if (unrestricted) {
++            return true;
++        }
++        FileSystemInfo nearest = null;
++        for (Path candidate = path.normalize(); candidate != null; candidate = candidate.getParent()) {
++            if (ambiguousMountPoints.contains(candidate)) {
++                return false;
++            }
++            if (nearest == null) {
++                nearest = fileSystems.get(candidate);
++            }
++        }
++        return nearest != null && supported.test(nearest);
++    }
++
++    /**
++     * Returns roots requiring conservative invalidation after the mount table changes.
++     * A change between unrestricted and detected modes requires full invalidation by the caller.
++     */
++    public FileHierarchySet changedMountPointsSince(WatchableFileSystems previous) {
++        if (unrestricted != previous.unrestricted) {
++            throw new IllegalArgumentException("Watching mode changes require full invalidation");
++        }
++        Set<Path> mountPoints = new HashSet<>(fileSystems.keySet());
++        mountPoints.addAll(previous.fileSystems.keySet());
++        mountPoints.addAll(ambiguousMountPoints);
++        mountPoints.addAll(previous.ambiguousMountPoints);
++        FileHierarchySet changed = FileHierarchySet.empty();
++        for (Path mountPoint : mountPoints) {
++            boolean ambiguityChanged = ambiguousMountPoints.contains(mountPoint) != previous.ambiguousMountPoints.contains(mountPoint);
++            if (ambiguityChanged || !sameFileSystem(fileSystems.get(mountPoint), previous.fileSystems.get(mountPoint))) {
++                changed = changed.plus(mountPoint.toFile());
++            }
++        }
++        return changed;
++    }
++
++    private static boolean sameFileSystem(FileSystemInfo current, FileSystemInfo previous) {
++        return current == previous || (current != null && previous != null
++            && Objects.equals(current.getDeviceName(), previous.getDeviceName())
++            && Objects.equals(current.getFileSystemType(), previous.getFileSystemType())
++            && current.isRemote() == previous.isRemote());
++    }
++}
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetector.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetector.java
+index fc8470d74..8083e7e66 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetector.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetector.java
+@@ -20,16 +20,16 @@
+ import net.rubygrapefruit.platform.file.FileSystemInfo;
+ import net.rubygrapefruit.platform.file.FileSystems;
+ import org.gradle.internal.watch.vfs.WatchableFileSystemDetector;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import java.io.File;
+-import java.util.stream.Stream;
++import java.util.List;
+ 
+ public class DefaultWatchableFileSystemDetector implements WatchableFileSystemDetector {
+     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultWatchableFileSystemDetector.class);
+ 
+-    // !IMPORTANT! If changed, make sure to update the documentation in gradle_daemon.adoc
++    // !IMPORTANT! If changed, make sure to update the documentation in file_system_watching.adoc
+     private static final ImmutableSet<String> SUPPORTED_FILE_SYSTEM_TYPES = ImmutableSet.of(
+         // APFS on macOS
+         "apfs",
+@@ -39,6 +39,7 @@ public class DefaultWatchableFileSystemDetector implements WatchableFileSystemDe
+         "ext4",
+         "btrfs",
+         "xfs",
++        "f2fs",
+         // NTFS on macOS
+         "ntfs",
+         // NTFS on Windows
+@@ -58,21 +59,15 @@ public DefaultWatchableFileSystemDetector(FileSystems fileSystems) {
+     }
+ 
+     @Override
+-    public Stream<File> detectUnsupportedFileSystems() {
+-        return fileSystems.getFileSystems().stream()
+-            .filter(fileSystem -> {
+-                LOGGER.debug("Detected {}: {} from {} (remote: {})",
+-                    fileSystem.getFileSystemType(),
+-                    fileSystem.getMountPoint(),
+-                    fileSystem.getDeviceName(),
+-                    fileSystem.isRemote()
+-                );
+-                // We don't support network file systems
+-                if (fileSystem.isRemote()) {
+-                    return true;
+-                }
+-                return !SUPPORTED_FILE_SYSTEM_TYPES.contains(fileSystem.getFileSystemType());
+-            })
+-            .map(FileSystemInfo::getMountPoint);
++    public WatchableFileSystems detectFileSystems() {
++        List<FileSystemInfo> detected = fileSystems.getFileSystems();
++        detected.forEach(fileSystem -> LOGGER.debug("Detected {}: {} from {} (remote: {})",
++            fileSystem.getFileSystemType(),
++            fileSystem.getMountPoint(),
++            fileSystem.getDeviceName(),
++            fileSystem.isRemote()
++        ));
++        return WatchableFileSystems.detect(detected, fileSystem ->
++            !fileSystem.isRemote() && SUPPORTED_FILE_SYSTEM_TYPES.contains(fileSystem.getFileSystemType()));
+     }
+ }
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystem.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystem.java
+index bf65c4296..df114dcef 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystem.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystem.java
+@@ -40,19 +40,19 @@
+ import org.gradle.internal.watch.vfs.FileSystemWatchingStatistics;
+ import org.gradle.internal.watch.vfs.VfsLogging;
+ import org.gradle.internal.watch.vfs.WatchableFileSystemDetector;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import javax.annotation.CheckReturnValue;
+ import java.io.Closeable;
+ import java.io.File;
+ import java.io.IOException;
+ import java.nio.file.Path;
+-import java.util.ArrayList;
+ import java.util.LinkedHashSet;
+ import java.util.List;
+ import java.util.Set;
+ import java.util.function.Supplier;
++import javax.annotation.CheckReturnValue;
+ 
+ public class WatchingVirtualFileSystem extends AbstractVirtualFileSystem implements BuildLifecycleAwareVirtualFileSystem, Closeable {
+     private static final Logger LOGGER = LoggerFactory.getLogger(WatchingVirtualFileSystem.class);
+@@ -64,7 +64,7 @@ public class WatchingVirtualFileSystem extends AbstractVirtualFileSystem impleme
+     private final FileWatchingFilter locationsWrittenByCurrentBuild;
+     private final WatchableFileSystemDetector watchableFileSystemDetector;
+     private final FileChangeListeners fileChangeListeners;
+-    private final List<File> unsupportedFileSystems = new ArrayList<>();
++    private WatchableFileSystems watchableFileSystems = WatchableFileSystems.UNRESTRICTED;
+     private Logger warningLogger = LOGGER;
+ 
+     /**
+@@ -121,10 +121,9 @@ public SnapshotHierarchy call(BuildOperationContext context) {
+                     SnapshotHierarchy newRoot;
+                     boolean couldDetectUnsupportedFileSystems;
+                     try {
+-                        unsupportedFileSystems.clear();
+-                        if (watchMode == WatchMode.DEFAULT) {
+-                            watchableFileSystemDetector.detectUnsupportedFileSystems().forEach(unsupportedFileSystems::add);
+-                        }
++                        watchableFileSystems = watchMode == WatchMode.DEFAULT
++                            ? watchableFileSystemDetector.detectFileSystems()
++                            : WatchableFileSystems.UNRESTRICTED;
+                         couldDetectUnsupportedFileSystems = true;
+                     } catch (NativeException e) {
+                         couldDetectUnsupportedFileSystems = false;
+@@ -134,7 +133,7 @@ public SnapshotHierarchy call(BuildOperationContext context) {
+                     if (watchRegistry == null) {
+                         if (couldDetectUnsupportedFileSystems) {
+                             context.setStatus("Starting file system watching");
+-                            newRoot = startWatching(currentRoot, watchMode, unsupportedFileSystems);
++                            newRoot = startWatching(currentRoot, watchMode, watchableFileSystems);
+                         } else {
+                             newRoot = currentRoot.empty();
+                         }
+@@ -144,7 +143,7 @@ public SnapshotHierarchy call(BuildOperationContext context) {
+                         if (hasDroppedStateBecauseOfErrorsReceivedWhileWatching(statistics) || !couldDetectUnsupportedFileSystems) {
+                             newRoot = stopWatchingAndInvalidateHierarchyAfterError(currentRoot);
+                         } else {
+-                            newRoot = watchRegistry.updateVfsOnBuildStarted(currentRoot, watchMode, unsupportedFileSystems);
++                            newRoot = watchRegistry.updateVfsOnBuildStarted(currentRoot, watchMode, watchableFileSystems);
+                         }
+                         stateInvalidatedAtStartOfBuild = newRoot != currentRoot;
+                         statisticsSinceLastBuild = new DefaultFileSystemWatchingStatistics(statistics, newRoot);
+@@ -238,7 +237,7 @@ public SnapshotHierarchy call(BuildOperationContext context) {
+                         } else {
+                             // We'll clean this up further after the daemon has finished with the build, see afterBuildFinished()
+                             newRoot = withWatcherChangeErrorHandling(currentRoot, () ->
+-                                watchRegistry.updateVfsBeforeBuildFinished(currentRoot, maximumNumberOfWatchedHierarchies, unsupportedFileSystems));
++                                watchRegistry.updateVfsBeforeBuildFinished(currentRoot, maximumNumberOfWatchedHierarchies, watchableFileSystems));
+                         }
+                         statisticsDuringBuild = new DefaultFileSystemWatchingStatistics(statistics, newRoot);
+                         if (vfsLogging == VfsLogging.VERBOSE) {
+@@ -314,14 +313,14 @@ public void afterBuildFinished() {
+      * Start watching the known areas of the file system for changes.
+      */
+     @CheckReturnValue
+-    private SnapshotHierarchy startWatching(SnapshotHierarchy currentRoot, WatchMode watchMode, List<File> unsupportedFileSystems) {
++    private SnapshotHierarchy startWatching(SnapshotHierarchy currentRoot, WatchMode watchMode, WatchableFileSystems watchableFileSystems) {
+         try {
+             watchRegistry = watcherRegistryFactory.createFileWatcherRegistry(new FilterChangesToOutputsChangesHandler(locationsWrittenByCurrentBuild,
+                 new CompositeChangeHandler(
+                     new InvalidateVfsChangeHandler(),
+                     new BroadcastingChangeHandler()
+                 )));
+-            SnapshotHierarchy newRoot = watchRegistry.updateVfsOnBuildStarted(currentRoot.empty(), watchMode, unsupportedFileSystems);
++            SnapshotHierarchy newRoot = watchRegistry.updateVfsOnBuildStarted(currentRoot.empty(), watchMode, watchableFileSystems);
+             watchableHierarchiesRegisteredEarly.forEach(watchableHierarchy -> watchRegistry.registerWatchableHierarchy(watchableHierarchy, newRoot));
+             watchableHierarchiesRegisteredEarly.clear();
+             return newRoot;
+@@ -474,7 +473,7 @@ private void logWatchingError(Exception exception, String fileWatchingErrorMessa
+ 
+     /**
+      * Stop watching the known areas of the file system, and invalidate
+-     * the parts that have been changed since calling {@link #startWatching(SnapshotHierarchy, WatchMode, List)}}.
++     * the parts that have been changed since calling {@link #startWatching(SnapshotHierarchy, WatchMode, WatchableFileSystems)}}.
+      */
+     private void stopWatchingAndInvalidateHierarchyAfterError() {
+         updateRootUnderLock(this::stopWatchingAndInvalidateHierarchyAfterError);
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdaterTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdaterTest.groovy
+index d6705fadb..4f48f5aba 100644
+--- a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdaterTest.groovy
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/AbstractFileWatcherUpdaterTest.groovy
+@@ -16,6 +16,7 @@
+ 
+ package org.gradle.internal.watch.registry.impl
+ 
++import net.rubygrapefruit.platform.internal.DefaultFileSystemInfo
+ import org.gradle.api.internal.cache.StringInterner
+ import org.gradle.api.internal.file.TestFiles
+ import org.gradle.api.internal.file.TestVirtualFileSystem
+@@ -34,6 +35,7 @@ import org.gradle.internal.vfs.impl.DefaultSnapshotHierarchy
+ import org.gradle.internal.watch.registry.FileWatcherProbeRegistry
+ import org.gradle.internal.watch.registry.FileWatcherUpdater
+ import org.gradle.internal.watch.registry.WatchMode
++import org.gradle.internal.watch.vfs.WatchableFileSystems
+ import org.gradle.test.fixtures.file.CleanupTestDirectory
+ import org.gradle.test.fixtures.file.TestFile
+ import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
+@@ -255,7 +257,7 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         def unwatchableContent = unsupportedFileSystemMountPoint.file("file.txt").createFile()
+ 
+         when:
+-        buildStarted(WatchMode.DEFAULT, [unsupportedFileSystemMountPoint])
++        buildStarted(WatchMode.DEFAULT, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         registerWatchableHierarchies([unsupportedFileSystemMountPoint])
+         addSnapshot(snapshotRegularFile(unwatchableContent))
+         then:
+@@ -263,7 +265,7 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         0 * _
+ 
+         when:
+-        buildFinished(Integer.MAX_VALUE, [unsupportedFileSystemMountPoint])
++        buildFinished(Integer.MAX_VALUE, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         then:
+         !vfsHasSnapshotsAt(unwatchableContent)
+         0 * _
+@@ -312,7 +314,7 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+ 
+         when:
+         registerWatchableHierarchies([unsupportedFileSystemMountPoint])
+-        buildStarted(WatchMode.DEFAULT, [unsupportedFileSystemMountPoint])
++        buildStarted(WatchMode.DEFAULT, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         addSnapshot(snapshotRegularFile(unwatchableContent))
+         then:
+         vfsHasSnapshotsAt(unwatchableContent)
+@@ -321,7 +323,7 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         0 * _
+ 
+         when:
+-        buildFinished(Integer.MAX_VALUE, [unsupportedFileSystemMountPoint])
++        buildFinished(Integer.MAX_VALUE, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         then:
+         !vfsHasSnapshotsAt(unwatchableContent)
+         0 * _
+@@ -332,7 +334,7 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         def unwatchableContent = unsupportedFileSystemMountPoint.file("file.txt").createFile()
+ 
+         when:
+-        buildStarted(WatchMode.DEFAULT, [unsupportedFileSystemMountPoint])
++        buildStarted(WatchMode.DEFAULT, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         registerWatchableHierarchies([unsupportedFileSystemMountPoint])
+         addSnapshot(snapshotRegularFile(unwatchableContent))
+         then:
+@@ -340,7 +342,7 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         0 * _
+ 
+         when:
+-        buildFinished(Integer.MAX_VALUE, [unsupportedFileSystemMountPoint])
++        buildFinished(Integer.MAX_VALUE, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         then:
+         !vfsHasSnapshotsAt(unwatchableContent)
+ 
+@@ -440,6 +442,72 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         0 * _
+     }
+ 
++    def "retains whole supported snapshot objects and preserves symlink cleanup"() {
++        def project = file("project").createDir()
++        def link = project.file("link.txt").createFile()
++        def regular = project.file("regular.txt").createFile()
++        def fileSystems = WatchableFileSystems.detect([
++            new DefaultFileSystemInfo(project, "f2fs", "local", false, null)
++        ], { true })
++        buildStarted(WatchMode.DEFAULT, fileSystems)
++        registerWatchableHierarchies([project])
++        def original = snapshotDirectory(project)
++        def symlinkSnapshot = snapshotSymlinkedFile(link)
++        def children = original.children.collect { it.name == link.name ? symlinkSnapshot : it }
++        original = new DirectorySnapshot(original.absolutePath, original.name, original.accessType, original.hash, children)
++        addSnapshot(original)
++
++        when:
++        buildFinished(Integer.MAX_VALUE, fileSystems)
++
++        then:
++        virtualFileSystem.root.findSnapshot(project.absolutePath).get().is(original)
++        virtualFileSystem.root.findSnapshot(link.absolutePath).get().is(symlinkSnapshot)
++        symlinkSnapshot.accessType == AccessType.VIA_SYMLINK
++        0 * watcher.startWatching(_)
++        0 * watcher.stopWatching(_)
++
++        when:
++        virtualFileSystem.root = updater.updateVfsBeforeAfterFinished(virtualFileSystem.root)
++
++        then:
++        !virtualFileSystem.root.findMetadata(link.absolutePath).present
++        !virtualFileSystem.root.findSnapshot(project.absolutePath).present
++        vfsHasSnapshotsAt(regular)
++    }
++
++    def "mount changes invalidate affected snapshots but preserve unrelated watched roots"() {
++        def changed = file("changed").createDir()
++        def stable = file("stable").createDir()
++        def changedFile = changed.file("file.txt").createFile()
++        def stableFile = stable.file("file.txt").createFile()
++        def initial = WatchableFileSystems.detect([
++            new DefaultFileSystemInfo(changed, "f2fs", "local", false, null),
++            new DefaultFileSystemInfo(stable, "f2fs", "stable", false, null)
++        ], { it.fileSystemType == "f2fs" })
++        buildStarted(WatchMode.DEFAULT, initial)
++        registerWatchableHierarchies([changed, stable])
++        addSnapshot(snapshotRegularFile(changedFile))
++        def stableSnapshot = snapshotRegularFile(stableFile)
++        addSnapshot(stableSnapshot)
++        buildFinished(Integer.MAX_VALUE, initial)
++        def next = WatchableFileSystems.detect([
++            new DefaultFileSystemInfo(stable, "f2fs", "stable", false, null),
++            new DefaultFileSystemInfo(changed, "tmpfs", "replacement", false, null)
++        ], { it.fileSystemType == "f2fs" })
++
++        when:
++        buildStarted(WatchMode.DEFAULT, next)
++
++        then:
++        !virtualFileSystem.root.findMetadata(changedFile.absolutePath).present
++        virtualFileSystem.root.findSnapshot(stableFile.absolutePath).get().is(stableSnapshot)
++        !watchableHierarchies.isInWatchableHierarchy(changed.absolutePath)
++        watchableHierarchies.isInWatchableHierarchy(stable.absolutePath)
++        0 * watcher.startWatching(_)
++        0 * watcher.stopWatching({ it.contains(stable) })
++    }
++
+     TestFile file(Object... path) {
+         temporaryFolder.testDirectory.file(path)
+     }
+@@ -502,13 +570,20 @@ abstract class AbstractFileWatcherUpdaterTest extends Specification {
+         probeLocationResolver.apply(watchableHierarchy)
+     }
+ 
+-    SnapshotHierarchy buildStarted(WatchMode watchMode = WatchMode.DEFAULT, List<File> unsupportedFileSystems = []) {
+-        virtualFileSystem.root = updater.updateVfsOnBuildStarted(virtualFileSystem.root, watchMode, unsupportedFileSystems)
++    SnapshotHierarchy buildStarted(WatchMode watchMode = WatchMode.DEFAULT, WatchableFileSystems fileSystems = WatchableFileSystems.UNRESTRICTED) {
++        virtualFileSystem.root = updater.updateVfsOnBuildStarted(virtualFileSystem.root, watchMode, fileSystems)
+         return virtualFileSystem.root
+     }
+ 
+-    void buildFinished(int maximumNumberOfWatchedHierarchies = Integer.MAX_VALUE, List<File> unsupportedFileSystems = []) {
+-        virtualFileSystem.root = updater.updateVfsBeforeBuildFinished(virtualFileSystem.root, maximumNumberOfWatchedHierarchies, unsupportedFileSystems)
++    void buildFinished(int maximumNumberOfWatchedHierarchies = Integer.MAX_VALUE, WatchableFileSystems fileSystems = WatchableFileSystems.UNRESTRICTED) {
++        virtualFileSystem.root = updater.updateVfsBeforeBuildFinished(virtualFileSystem.root, maximumNumberOfWatchedHierarchies, fileSystems)
++    }
++
++    WatchableFileSystems fileSystemsWithUnsupported(File unsupportedMount) {
++        WatchableFileSystems.detect([
++            new DefaultFileSystemInfo(temporaryFolder.testDirectory, "ext4", "supported", false, null),
++            new DefaultFileSystemInfo(unsupportedMount, "unknown", "unsupported", false, null)
++        ], { it.fileSystemType == "ext4" })
+     }
+ 
+     TestFile addSnapshotInWatchableHierarchy(TestFile projectRootDirectory) {
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdaterTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdaterTest.groovy
+index 8b12adb62..0122b7771 100644
+--- a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdaterTest.groovy
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/HierarchicalFileWatcherUpdaterTest.groovy
+@@ -361,7 +361,7 @@ class HierarchicalFileWatcherUpdaterTest extends AbstractFileWatcherUpdaterTest
+         0 * _
+ 
+         when:
+-        buildFinished(Integer.MAX_VALUE, [unsupportedFileSystemMountPoint])
++        buildFinished(Integer.MAX_VALUE, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         then:
+         vfsHasSnapshotsAt(watchableContent)
+         !vfsHasSnapshotsAt(unwatchableContent)
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdaterTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdaterTest.groovy
+index 56f5e182b..1f0c962fd 100644
+--- a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdaterTest.groovy
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/NonHierarchicalFileWatcherUpdaterTest.groovy
+@@ -129,7 +129,7 @@ class NonHierarchicalFileWatcherUpdaterTest extends AbstractFileWatcherUpdaterTe
+         0 * _
+ 
+         when:
+-        buildFinished(Integer.MAX_VALUE,  [unsupportedFileSystemMountPoint])
++        buildFinished(Integer.MAX_VALUE, fileSystemsWithUnsupported(unsupportedFileSystemMountPoint))
+         then:
+         vfsHasSnapshotsAt(watchableContent)
+         !vfsHasSnapshotsAt(unwatchableContent)
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/WatchableHierarchiesTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/WatchableHierarchiesTest.groovy
+new file mode 100644
+index 000000000..6fefebffc
+--- /dev/null
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/registry/impl/WatchableHierarchiesTest.groovy
+@@ -0,0 +1,88 @@
++/*
++ * Copyright 2026 the original author or authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.gradle.internal.watch.registry.impl
++
++import net.rubygrapefruit.platform.internal.DefaultFileSystemInfo
++import org.gradle.internal.snapshot.MetadataSnapshot
++import org.gradle.internal.snapshot.SnapshotHierarchy
++import org.gradle.internal.snapshot.TestSnapshotFixture
++import org.gradle.internal.watch.registry.FileWatcherProbeRegistry
++import org.gradle.internal.watch.registry.WatchMode
++import org.gradle.internal.watch.vfs.WatchableFileSystems
++import spock.lang.Specification
++
++import java.nio.file.Paths
++import java.util.stream.Stream
++
++import static org.gradle.internal.snapshot.CaseSensitivity.CASE_SENSITIVE
++
++class WatchableHierarchiesTest extends Specification implements TestSnapshotFixture {
++    def "retains original supported islands and discards mixed hashes and orphan metadata"() {
++        def path = { String relative -> Paths.get("watchable-hierarchies-test").toAbsolutePath().resolve(relative).toString() }
++        def stable = directory(path("root/volume/stable"), [regularFile(path("root/volume/stable/keep"))])
++        def island = directory(path("root/volume/temporary/island"), [regularFile(path("root/volume/temporary/island/keep"))])
++        def rejected = regularFile(path("root/volume/temporary/discard"))
++        def remote = regularFile(path("root/volume/remote/discard"))
++        def original = directory(path("root/volume"), [
++            stable,
++            directory(path("root/volume/temporary"), [rejected, island]),
++            directory(path("root/volume/remote"), [remote])
++        ])
++        def fileSystems = WatchableFileSystems.detect([
++            new DefaultFileSystemInfo(new File(path("root")), "erofs", "root", false, null),
++            new DefaultFileSystemInfo(new File(path("root/volume")), "f2fs", "local", false, null),
++            new DefaultFileSystemInfo(new File(path("root/volume/temporary")), "tmpfs", "temporary", false, null),
++            new DefaultFileSystemInfo(new File(island.absolutePath), "f2fs", "local", false, null),
++            new DefaultFileSystemInfo(new File(path("root/volume/remote")), "ext4", "remote", true, null)
++        ], { !it.remote && it.fileSystemType in ["f2fs", "ext4"] })
++        def probes = Stub(FileWatcherProbeRegistry) {
++            unprovenHierarchies() >> { Stream.empty() }
++        }
++        def hierarchies = new WatchableHierarchies(probes, { false })
++        def invalidator = { root, action -> action.apply(root, SnapshotHierarchy.NodeDiffListener.NOOP) } as WatchableHierarchies.Invalidator
++        def empty = buildHierarchy(CASE_SENSITIVE, [])
++        hierarchies.removeUnwatchableContentOnBuildStart(empty, invalidator, WatchMode.DEFAULT, fileSystems)
++        hierarchies.registerWatchableHierarchy(new File(path("root/volume")), empty)
++        def root = buildHierarchy(CASE_SENSITIVE, [original])
++        root = root.store(path("orphan"), MetadataSnapshot.DIRECTORY, SnapshotHierarchy.NodeDiffListener.NOOP)
++        assert root.findMetadata(path("orphan")).present
++
++        when:
++        root = hierarchies.removeUnwatchableContentBeforeBuildFinished(root, { true }, Integer.MAX_VALUE, fileSystems, invalidator)
++        root = hierarchies.removeUnwatchableContentAfterBuildFinished(root, invalidator)
++
++        then:
++        root.findSnapshot(stable.absolutePath).get().is(stable)
++        root.findSnapshot(island.absolutePath).get().is(island)
++        !root.findSnapshot(original.absolutePath).present
++        !root.findSnapshot(path("root/volume/temporary")).present
++        !root.findMetadata(rejected.absolutePath).present
++        !root.findMetadata(remote.absolutePath).present
++        !root.findMetadata(path("orphan")).present
++
++        when:
++        root = buildHierarchy(CASE_SENSITIVE, [directory(path("root"), [original])])
++        root = hierarchies.removeUnwatchableContentBeforeBuildFinished(root, { true }, Integer.MAX_VALUE, fileSystems, invalidator)
++        root = hierarchies.removeUnwatchableContentAfterBuildFinished(root, invalidator)
++
++        then:
++        // A complete snapshot above the registered hierarchy was not watched as a root.
++        !root.rootSnapshots().findAny().present
++        !root.findMetadata(stable.absolutePath).present
++        !root.findMetadata(island.absolutePath).present
++    }
++}
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/WatchableFileSystemsTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/WatchableFileSystemsTest.groovy
+new file mode 100644
+index 000000000..2e94a05c8
+--- /dev/null
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/WatchableFileSystemsTest.groovy
+@@ -0,0 +1,226 @@
++/*
++ * Copyright 2026 the original author or authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.gradle.internal.watch.vfs
++
++import net.rubygrapefruit.platform.NativeException
++import net.rubygrapefruit.platform.file.FileSystemInfo
++import net.rubygrapefruit.platform.internal.DefaultFileSystemInfo
++import spock.lang.Specification
++
++import java.nio.file.Path
++import java.nio.file.Paths
++
++class WatchableFileSystemsTest extends Specification {
++    private static final Path ROOT = Paths.get("mount-policy-test").toAbsolutePath()
++
++    def "most specific mount preserves supported islands and unsupported nested mounts"() {
++        def policy = detect([
++            fs("root", ROOT, "unsupported"),
++            fs("data", ROOT.resolve("data")),
++            fs("nested", ROOT.resolve("data/nested"), "unsupported"),
++            fs("island", ROOT.resolve("data/nested/island")),
++        ])
++
++        expect:
++        !policy.isSupported(ROOT.toString())
++        !policy.isSupported(ROOT.resolve("sibling/file").toString())
++        policy.isSupported(ROOT.resolve("data/file").toString())
++        !policy.isSupported(ROOT.resolve("data/nested/file").toString())
++        policy.isSupported(ROOT.resolve("data/nested/island/file").toString())
++        !policy.isUnrestricted()
++    }
++
++    def "remote mount overrides a supported ancestor"() {
++        def policy = detect([
++            fs("root", ROOT),
++            fs("remote", ROOT.resolve("remote"), "supported", true),
++        ])
++
++        expect:
++        policy.isSupported(ROOT.resolve("local").toString())
++        !policy.isSupported(ROOT.resolve("remote/file").toString())
++    }
++
++    def "mount matching is component wise and normalizes absolute paths"() {
++        def policy = detect([fs("data", ROOT.resolve("unused/../data"))])
++
++        expect:
++        policy.isSupported(ROOT.resolve("data").toString())
++        policy.isSupported(ROOT.resolve("data/sub/../file").toString())
++        !policy.isSupported(ROOT.resolve("database/file").toString())
++        !policy.isSupported(ROOT.toString())
++    }
++
++    def "empty table and paths outside known mounts are unsupported"() {
++        expect:
++        !detect([]).isSupported(ROOT.toString())
++        !detect([fs("data", ROOT.resolve("data"))]).isSupported(ROOT.resolve("other").toString())
++        WatchableFileSystems.UNRESTRICTED.isSupported(ROOT.toString())
++        WatchableFileSystems.UNRESTRICTED.isUnrestricted()
++    }
++
++    def "relative mount metadata fails closed"() {
++        when:
++        detect([fs("relative", Paths.get("relative/../mount"))])
++
++        then:
++        def failure = thrown(NativeException)
++        failure.message.contains("not absolute")
++    }
++
++    def "relative query paths are rejected in either mode"() {
++        when:
++        policy.isSupported("relative/path")
++
++        then:
++        thrown(IllegalArgumentException)
++
++        where:
++        policy << [detect([]), WatchableFileSystems.UNRESTRICTED]
++    }
++
++    def "ambiguous mounts exclude nested unique mounts without affecting unrelated paths in either order"() {
++        def first = fs("first", ROOT.resolve("data"))
++        def second = fs("second", ROOT.resolve("other/../data"), "unsupported")
++        def policy = detect([
++            fs("root", ROOT),
++            fs("nested", ROOT.resolve("data/nested")),
++            fs("sibling", ROOT.resolve("sibling")),
++        ] + (reverse ? [second, first] : [first, second]))
++
++        expect:
++        !policy.isSupported(ROOT.resolve("data").toString())
++        !policy.isSupported(ROOT.resolve("data/file").toString())
++        !policy.isSupported(ROOT.resolve("data/nested/file").toString())
++        policy.isSupported(ROOT.resolve("sibling/file").toString())
++        policy.isSupported(ROOT.resolve("database/file").toString())
++        policy.isSupported(ROOT.toString())
++
++        where:
++        reverse << [false, true]
++    }
++
++    def "identical duplicate rows stay ambiguous after additional rows"() {
++        def mount = fs("same", ROOT.resolve("data"))
++        def policy = detect([fs("root", ROOT), mount, mount] + additionalRows)
++
++        expect:
++        !policy.isSupported(ROOT.resolve("data/file").toString())
++        policy.isSupported(ROOT.resolve("sibling/file").toString())
++
++        where:
++        additionalRows << [[], [fs("same", ROOT.resolve("data"))], [fs("third", ROOT.resolve("data"))]]
++    }
++
++    def "equivalent reordered mount records do not invalidate anything"() {
++        def previous = detect([fs("root", ROOT), fs("child", ROOT.resolve("child"))])
++        def current = detect([fs("child", ROOT.resolve("unused/../child")), fs("root", ROOT)])
++
++        expect:
++        current.changedMountPointsSince(previous).empty
++        previous.changedMountPointsSince(current).empty
++    }
++
++    def "added removed and changed mount identities invalidate their descendants"() {
++        def previous = detect([fs("root", ROOT)] + before)
++        def current = detect([fs("root", ROOT)] + after)
++        def changed = current.changedMountPointsSince(previous)
++
++        expect:
++        changed.contains(ROOT.resolve("child").toFile())
++        changed.contains(ROOT.resolve("child/descendant").toFile())
++        !changed.contains(ROOT.resolve("sibling").toFile())
++        !changed.contains(ROOT.toFile())
++
++        where:
++        before                                    | after
++        []                                        | [fs("new", ROOT.resolve("child"))]
++        [fs("old", ROOT.resolve("child"))]        | []
++        [fs("old", ROOT.resolve("child"))]        | [fs("new", ROOT.resolve("child"))]
++        [fs("same", ROOT.resolve("child"))]       | [fs("same", ROOT.resolve("child"), "unsupported")]
++        [fs("same", ROOT.resolve("child"))]       | [fs("same", ROOT.resolve("child"), "supported", true)]
++    }
++
++    def "a moved mount invalidates both its old and new paths"() {
++        def previous = detect([fs("device", ROOT.resolve("old"))])
++        def current = detect([fs("device", ROOT.resolve("new"))])
++        def changed = current.changedMountPointsSince(previous)
++
++        expect:
++        changed.contains(ROOT.resolve("old/file").toFile())
++        changed.contains(ROOT.resolve("new/file").toFile())
++        !changed.contains(ROOT.resolve("other/file").toFile())
++    }
++
++    def "transitions between ambiguous and absent or unique mounts invalidate only that subtree"() {
++        def unambiguous = detect([fs("root", ROOT)] + rows)
++        def ambiguous = detect([
++            fs("root", ROOT),
++            fs("first", ROOT.resolve("child")),
++            fs("second", ROOT.resolve("child")),
++        ])
++        def changed = reverse ? unambiguous.changedMountPointsSince(ambiguous) : ambiguous.changedMountPointsSince(unambiguous)
++
++        expect:
++        changed.contains(ROOT.resolve("child").toFile())
++        changed.contains(ROOT.resolve("child/descendant").toFile())
++        !changed.contains(ROOT.resolve("sibling").toFile())
++        !changed.contains(ROOT.toFile())
++
++        where:
++        rows                                 | reverse
++        []                                   | false
++        []                                   | true
++        [fs("first", ROOT.resolve("child"))] | false
++        [fs("first", ROOT.resolve("child"))] | true
++    }
++
++    def "mount table is independent of subsequent input list changes"() {
++        def rows = [fs("root", ROOT)]
++        def policy = detect(rows)
++        rows.clear()
++
++        expect:
++        policy.isSupported(ROOT.resolve("file").toString())
++    }
++
++    def "mode changes require full invalidation by the caller"() {
++        when:
++        current.changedMountPointsSince(previous)
++
++        then:
++        thrown(IllegalArgumentException)
++
++        where:
++        current                           | previous
++        WatchableFileSystems.UNRESTRICTED | detect([])
++        detect([])                        | WatchableFileSystems.UNRESTRICTED
++    }
++
++    def "unrestricted mode is unchanged"() {
++        expect:
++        WatchableFileSystems.UNRESTRICTED.changedMountPointsSince(WatchableFileSystems.UNRESTRICTED).empty
++    }
++
++    private static WatchableFileSystems detect(List<FileSystemInfo> fileSystems) {
++        WatchableFileSystems.detect(fileSystems, { it.fileSystemType == "supported" && !it.remote })
++    }
++
++    private static FileSystemInfo fs(String device, Path mount, String type = "supported", boolean remote = false) {
++        new DefaultFileSystemInfo(mount.toFile(), type, device, remote, null)
++    }
++}
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetectorTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetectorTest.groovy
+index 40c218800..158c4a726 100644
+--- a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetectorTest.groovy
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/DefaultWatchableFileSystemDetectorTest.groovy
+@@ -22,7 +22,6 @@ import net.rubygrapefruit.platform.internal.DefaultFileSystemInfo
+ import spock.lang.Specification
+ 
+ import java.nio.file.Paths
+-import java.util.stream.Collectors
+ 
+ class DefaultWatchableFileSystemDetectorTest extends Specification {
+     def fileSystemsService = Stub(FileSystems)
+@@ -32,7 +31,7 @@ class DefaultWatchableFileSystemDetectorTest extends Specification {
+         fileSystemsService.fileSystems >> []
+ 
+         expect:
+-        detect() == []
++        !detector.detectFileSystems().isSupported(path("/"))
+     }
+ 
+     def "handles all supported"() {
+@@ -42,7 +41,9 @@ class DefaultWatchableFileSystemDetectorTest extends Specification {
+         ]
+ 
+         expect:
+-        detect() == []
++        def policy = detector.detectFileSystems()
++        policy.isSupported(path("/file"))
++        policy.isSupported(path("/mnt/supported/file"))
+     }
+ 
+     def "handles matching #description"() {
+@@ -52,7 +53,10 @@ class DefaultWatchableFileSystemDetectorTest extends Specification {
+         ]
+ 
+         expect:
+-        detect() == [unsupported.mountPoint]
++        def policy = detector.detectFileSystems()
++        !policy.isSupported(unsupported.mountPoint.toString())
++        !policy.isSupported(new File(unsupported.mountPoint, "file").toString())
++        policy.isSupported(path("/mnt/other/file"))
+ 
+         where:
+         description   | unsupported
+@@ -60,12 +64,29 @@ class DefaultWatchableFileSystemDetectorTest extends Specification {
+         "remote"      | fs("/dev/remote", "/mnt/unsupported", "ext4", true)
+     }
+ 
+-    private List<FileSystemInfo> detect() {
+-        detector.detectUnsupportedFileSystems()
+-            .collect(Collectors.toList())
++    def "supports local F2FS islands without enabling unsupported ancestors or remote F2FS"() {
++        fileSystemsService.fileSystems >> [
++            fs("root", "/", "erofs"),
++            fs("data", "/data", "f2fs"),
++            fs("nested", "/data/nested", "tmpfs"),
++            fs("island", "/data/nested/island", "f2fs"),
++            fs("remote", "/data/remote", "f2fs", true),
++        ]
++
++        expect:
++        def policy = detector.detectFileSystems()
++        !policy.isSupported(path("/other"))
++        policy.isSupported(path("/data/file"))
++        !policy.isSupported(path("/data/nested/file"))
++        policy.isSupported(path("/data/nested/island/file"))
++        !policy.isSupported(path("/data/remote/file"))
+     }
+ 
+     private static FileSystemInfo fs(String deviceName, String mountPoint, String type, boolean remote = false) {
+-        return new DefaultFileSystemInfo(Paths.get(mountPoint).toFile(), type, deviceName, remote, null)
++        return new DefaultFileSystemInfo(Paths.get(mountPoint).toAbsolutePath().toFile(), type, deviceName, remote, null)
++    }
++
++    private static String path(String path) {
++        Paths.get(path).toAbsolutePath().toString()
+     }
+ }
+diff --git a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystemTest.groovy b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystemTest.groovy
+index 8e7bc25e2..55ed27448 100644
+--- a/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystemTest.groovy
++++ b/platforms/core-execution/file-watching/src/test/groovy/org/gradle/internal/watch/vfs/impl/WatchingVirtualFileSystemTest.groovy
+@@ -17,6 +17,7 @@
+ package org.gradle.internal.watch.vfs.impl
+ 
+ import net.rubygrapefruit.platform.NativeException
++import net.rubygrapefruit.platform.internal.DefaultFileSystemInfo
+ import org.gradle.internal.operations.TestBuildOperationRunner
+ import org.gradle.internal.snapshot.CaseSensitivity
+ import org.gradle.internal.snapshot.SnapshotHierarchy
+@@ -28,6 +29,7 @@ import org.gradle.internal.watch.registry.impl.FileSystemWatchingDocumentationIn
+ import org.gradle.internal.watch.vfs.FileChangeListeners
+ import org.gradle.internal.watch.vfs.VfsLogging
+ import org.gradle.internal.watch.vfs.WatchableFileSystemDetector
++import org.gradle.internal.watch.vfs.WatchableFileSystems
+ import spock.lang.Specification
+ 
+ class WatchingVirtualFileSystemTest extends Specification {
+@@ -82,7 +84,7 @@ class WatchingVirtualFileSystemTest extends Specification {
+         watchingVirtualFileSystem.beforeBuildFinished(WatchMode.ENABLED, VfsLogging.NORMAL, buildOperationRunner, Integer.MAX_VALUE)
+         then:
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+-        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, []) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, WatchableFileSystems.UNRESTRICTED) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+@@ -113,7 +115,7 @@ class WatchingVirtualFileSystemTest extends Specification {
+         watchingVirtualFileSystem.beforeBuildFinished(WatchMode.ENABLED, VfsLogging.NORMAL, buildOperationRunner, Integer.MAX_VALUE)
+         then:
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+-        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, []) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, WatchableFileSystems.UNRESTRICTED) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+@@ -126,7 +128,7 @@ class WatchingVirtualFileSystemTest extends Specification {
+         watchingVirtualFileSystem.updateRootUnderLock { root -> nonEmptySnapshotHierarchy }
+         watchingVirtualFileSystem.afterBuildStarted(WatchMode.ENABLED, VfsLogging.NORMAL, buildOperationRunner)
+         then:
+-        1 * watcherRegistry.updateVfsOnBuildStarted(_ as SnapshotHierarchy, WatchMode.ENABLED, []) >> { SnapshotHierarchy root, watchMode, unsupportedFileSystems -> root }
++        1 * watcherRegistry.updateVfsOnBuildStarted(_ as SnapshotHierarchy, WatchMode.ENABLED, WatchableFileSystems.UNRESTRICTED) >> { SnapshotHierarchy root, watchMode, fileSystems -> root }
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+         0 * _
+ 
+@@ -163,7 +165,7 @@ class WatchingVirtualFileSystemTest extends Specification {
+         watchingVirtualFileSystem.beforeBuildFinished(WatchMode.ENABLED, VfsLogging.NORMAL, buildOperationRunner, Integer.MAX_VALUE)
+         then:
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+-        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, []) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, WatchableFileSystems.UNRESTRICTED) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+@@ -180,21 +182,21 @@ class WatchingVirtualFileSystemTest extends Specification {
+     }
+ 
+     def "detects unsupported file systems on default watch mode"() {
+-        def unsupportedFileSystems = [new File("unsupported")]
++        def fileSystems = WatchableFileSystems.detect([new DefaultFileSystemInfo(new File("unsupported").absoluteFile, "unknown", "device", false, null)], { false })
+ 
+         when:
+         watchingVirtualFileSystem.afterBuildStarted(WatchMode.DEFAULT, VfsLogging.NORMAL, buildOperationRunner)
+         then:
+-        1 * watchableFileSystemDetector.detectUnsupportedFileSystems() >> unsupportedFileSystems.stream()
++        1 * watchableFileSystemDetector.detectFileSystems() >> fileSystems
+         1 * watcherRegistryFactory.createFileWatcherRegistry(_) >> watcherRegistry
+-        1 * watcherRegistry.updateVfsOnBuildStarted(_, _, unsupportedFileSystems) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsOnBuildStarted(_, _, fileSystems) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+         watchingVirtualFileSystem.beforeBuildFinished(WatchMode.DEFAULT, VfsLogging.NORMAL, buildOperationRunner, Integer.MAX_VALUE)
+         then:
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+-        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, unsupportedFileSystems) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, fileSystems) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+@@ -204,11 +206,11 @@ class WatchingVirtualFileSystemTest extends Specification {
+         0 * _
+ 
+         when:
+-        unsupportedFileSystems = [new File("unsupported"), new File("anotherUnsupported")]
++        fileSystems = WatchableFileSystems.detect([], { false })
+         watchingVirtualFileSystem.afterBuildStarted(WatchMode.DEFAULT, VfsLogging.NORMAL, buildOperationRunner)
+         then:
+-        1 * watchableFileSystemDetector.detectUnsupportedFileSystems() >> unsupportedFileSystems.stream()
+-        1 * watcherRegistry.updateVfsOnBuildStarted(_ as SnapshotHierarchy, WatchMode.DEFAULT, unsupportedFileSystems) >> { SnapshotHierarchy root, watchMode, it -> root }
++        1 * watchableFileSystemDetector.detectFileSystems() >> fileSystems
++        1 * watcherRegistry.updateVfsOnBuildStarted(_ as SnapshotHierarchy, WatchMode.DEFAULT, fileSystems) >> { SnapshotHierarchy root, watchMode, it -> root }
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+         0 * _
+     }
+@@ -218,7 +220,7 @@ class WatchingVirtualFileSystemTest extends Specification {
+         def result = watchingVirtualFileSystem.afterBuildStarted(WatchMode.DEFAULT, VfsLogging.NORMAL, buildOperationRunner)
+         then:
+         !result
+-        1 * watchableFileSystemDetector.detectUnsupportedFileSystems() >> { throw new NativeException("Failed") }
++        1 * watchableFileSystemDetector.detectFileSystems() >> { throw new NativeException("Failed") }
+         0 * _
+     }
+ 
+@@ -227,14 +229,14 @@ class WatchingVirtualFileSystemTest extends Specification {
+         watchingVirtualFileSystem.afterBuildStarted(WatchMode.ENABLED, VfsLogging.NORMAL, buildOperationRunner)
+         then:
+         1 * watcherRegistryFactory.createFileWatcherRegistry(_) >> watcherRegistry
+-        1 * watcherRegistry.updateVfsOnBuildStarted(_, _, []) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsOnBuildStarted(_, _, WatchableFileSystems.UNRESTRICTED) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+         watchingVirtualFileSystem.beforeBuildFinished(WatchMode.ENABLED, VfsLogging.NORMAL, buildOperationRunner, Integer.MAX_VALUE)
+         then:
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+-        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, []) >> watchingVirtualFileSystem.root
++        1 * watcherRegistry.updateVfsBeforeBuildFinished(_, Integer.MAX_VALUE, WatchableFileSystems.UNRESTRICTED) >> watchingVirtualFileSystem.root
+         0 * _
+ 
+         when:
+@@ -247,7 +249,7 @@ class WatchingVirtualFileSystemTest extends Specification {
+         def result = watchingVirtualFileSystem.afterBuildStarted(WatchMode.DEFAULT, VfsLogging.NORMAL, buildOperationRunner)
+         then:
+         !result
+-        1 * watchableFileSystemDetector.detectUnsupportedFileSystems() >> { throw new NativeException("Failed") }
++        1 * watchableFileSystemDetector.detectFileSystems() >> { throw new NativeException("Failed") }
+         1 * watcherRegistry.getAndResetStatistics() >> Stub(FileWatcherRegistry.FileWatchingStatistics)
+         1 * watcherRegistry.close()
+         0 * _

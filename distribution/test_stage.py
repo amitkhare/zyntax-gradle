@@ -67,7 +67,8 @@ class SourceDeltaTest(unittest.TestCase):
     def verify(self):
         before = self.snapshot()
         try:
-            verify_source_delta(self.stage, self.verification, self.patch)
+            verify_source_delta(self.stage, self.verification, self.patch,
+                                "7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999")
         finally:
             self.assertEqual(before, self.snapshot(), "Guard mutated its source repository")
             self.assertEqual([], list(self.stage.glob("source-delta-*")))

@@ -4,7 +4,14 @@ project(jansi_android LANGUAGES C)
 if(NOT ANDROID OR NOT ANDROID_ABI STREQUAL "arm64-v8a")
   message(FATAL_ERROR "This recipe targets Android arm64-v8a.")
 endif()
-foreach(input JANSI_NATIVE_SOURCE HAWTJNI_SOURCE GENERATED_JNI)
+if(JANSI_API STREQUAL "2")
+  set(source_inputs JANSI_NATIVE_SOURCE)
+elseif(JANSI_API STREQUAL "1")
+  set(source_inputs JANSI_NATIVE_SOURCE HAWTJNI_SOURCE GENERATED_JNI)
+else()
+  message(FATAL_ERROR "JANSI_API must explicitly select source API 1 or 2.")
+endif()
+foreach(input IN LISTS source_inputs)
   if(NOT IS_DIRECTORY "${${input}}")
     message(FATAL_ERROR "${input} must name its prepared source directory.")
   endif()
@@ -40,15 +47,23 @@ if(NOT target_has_ioctl_and_termios_layout)
   message(FATAL_ERROR "Required Android ioctl/termios ABI is unavailable.")
 endif()
 
-set(native "${JANSI_NATIVE_SOURCE}/src/main/native-package/src")
-add_library(jansi SHARED
+if(JANSI_API STREQUAL "2")
+  set(native "${JANSI_NATIVE_SOURCE}/src/main/native")
+  add_library(jansi SHARED
+    "${native}/jansi.c" "${native}/jansi_structs.c"
+    "${native}/jansi_isatty.c" "${native}/jansi_ttyname.c")
+  target_include_directories(jansi PRIVATE "${native}")
+else()
+  set(native "${JANSI_NATIVE_SOURCE}/src/main/native-package/src")
+  add_library(jansi SHARED
   "${GENERATED_JNI}/jansi.c"
   "${GENERATED_JNI}/jansi_structs.c"
   "${GENERATED_JNI}/jansi_stats.c"
   "${HAWTJNI_SOURCE}/hawtjni-generator/src/main/resources/hawtjni.c"
   "${native}/jansi_isatty.c"
   "${native}/jansi_ttyname.c")
-target_include_directories(jansi PRIVATE "${GENERATED_JNI}" "${native}")
+  target_include_directories(jansi PRIVATE "${GENERATED_JNI}" "${native}")
+endif()
 target_compile_definitions(jansi PRIVATE
   HAVE_UNISTD_H=1 HAVE_STDLIB_H=1 HAVE_STRINGS_H=1 HAVE_TERMIOS_H=1 HAVE_IOCTL_H=1 HAVE_PTY_H=1
   HAVE_ISATTY=1 HAVE_TTYNAME=1 HAVE_TCGETATTR=1 HAVE_TCSETATTR=1 HAVE_IOCTL=1 HAVE_OPENPTY=1

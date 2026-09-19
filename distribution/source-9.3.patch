@@ -1,0 +1,141 @@
+diff --git a/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt b/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt
+index 5db6cc5d0..2a92b8a39 100644
+--- a/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt
++++ b/build-logic/dependency-modules/src/main/kotlin/gradlebuild/modules/extension/ExternalModulesExtension.kt
+@@ -68,7 +68,7 @@ abstract class ExternalModulesExtension(bundleGroovyMajor: Int) {
+     val googleHttpClientApacheV2 = "com.google.http-client:google-http-client-apache-v2"
+     val googleHttpClientGson = "com.google.http-client:google-http-client-gson"
+     val googleOauthClient = "com.google.oauth-client:google-oauth-client"
+-    val gradleFileEvents = "org.gradle.fileevents:gradle-fileevents"
++    val gradleFileEvents = "app.zyntax.gradle:gradle-fileevents"
+     val gradleIdeStarter = "org.gradle.buildtool.internal:gradle-ide-starter:$gradleIdeStarterVersion"
+     val gradleIdeStarterScenarios = "org.gradle.buildtool.internal:gradle-ide-starter-scenarios:$gradleIdeStarterVersion"
+     val gradleProfiler = "org.gradle.profiler:gradle-profiler"
+@@ -99,7 +99,7 @@ abstract class ExternalModulesExtension(bundleGroovyMajor: Int) {
+     val jacksonDatatypeJsr310 = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310"
+     val jakartaActivation = "com.sun.activation:jakarta.activation"
+     val jakartaXmlBind = "jakarta.xml.bind:jakarta.xml.bind-api"
+-    val jansi = "org.fusesource.jansi:jansi"
++    val jansi = "app.zyntax.gradle:jansi"
+     val jatl = "com.googlecode.jatl:jatl"
+     val javaPoet = "com.squareup:javapoet"
+     val jaxbCore = "com.sun.xml.bind:jaxb-core"
+@@ -150,7 +150,7 @@ abstract class ExternalModulesExtension(bundleGroovyMajor: Int) {
+     val mavenResolverTransportFile = "org.apache.maven.resolver:maven-resolver-transport-file"
+     val mavenResolverTransportHttp = "org.apache.maven.resolver:maven-resolver-transport-http"
+     val minlog = "com.esotericsoftware.minlog:minlog"
+-    val nativePlatform = "net.rubygrapefruit:native-platform"
++    val nativePlatform = "app.zyntax.gradle:native-platform"
+     val objenesis = "org.objenesis:objenesis"
+     val plexusCipher = "org.sonatype.plexus:plexus-cipher"
+     val plexusClassworlds = "org.codehaus.plexus:plexus-classworlds"
+diff --git a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
+index 3444fb032..3fefa13ad 100644
+--- a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
++++ b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
+@@ -16,7 +16,6 @@
+ 
+ import gradlebuild.basics.GradleModuleApiAttribute
+ import gradlebuild.basics.PublicApi
+-import gradlebuild.basics.buildVersionQualifier
+ import gradlebuild.basics.kotlindsl.configureKotlinCompilerForGradleBuild
+ import gradlebuild.basics.tasks.ClasspathManifest
+ import gradlebuild.basics.tasks.PackageListGenerator
+@@ -273,10 +272,7 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
+     val zipRootFolder = if (normalized) {
+         gradleModule.identity.version.map { "gradle-${it.baseVersion.version}" }
+     } else {
+-        gradleModule.identity.version.map { "gradle-${it.version}" }.map {
+-            if (buildVersionQualifier.isPresent) it.replace("-${buildVersionQualifier.get()}", "")
+-            else it
+-        }
++        gradleModule.identity.version.map { "gradle-${it.version}" }
+     }
+ 
+     val installation = tasks.register<Sync>("${name}Installation") {
+@@ -288,12 +284,15 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
+     val distributionZip = tasks.register<Zip>("${name}DistributionZip") {
+         archiveBaseName = "gradle"
+         archiveClassifier = name
+-        archiveVersion = gradleModule.identity.version.map { it.baseVersion.version }
++        archiveVersion = gradleModule.identity.version.map { if (normalized) it.baseVersion.version else it.version }
+ 
+         destinationDirectory = project.layout.buildDirectory.dir(disDir)
+ 
+         into(zipRootFolder) {
+             with(distributionSpec)
++            from(providers.gradleProperty("androidComponentsNotices")) {
++                into("licenses/android-host")
++            }
+         }
+     }
+ 
+diff --git a/packaging/distributions-dependencies/build.gradle.kts b/packaging/distributions-dependencies/build.gradle.kts
+index aa911c16a..316e3936a 100644
+--- a/packaging/distributions-dependencies/build.gradle.kts
++++ b/packaging/distributions-dependencies/build.gradle.kts
+@@ -28,7 +28,7 @@ val jaxbVersion = "3.0.0"
+ val junit5Version = "5.12.2"
+ val mavenVersion = "3.9.5"
+ val mavenResolverVersion = "1.9.16" // Should remain in-sync with `mavenVersion`
+-val nativePlatformVersion = "0.22-milestone-29"
++val nativePlatformVersion = "0.22-milestone-29-zyntax.1"
+ /**
+  * Should be in sync with:
+  * tooling API-related docs & snippets
+@@ -84,7 +84,7 @@ dependencies {
+         api(libs.eclipseSisuPlexus)     { version { strictly("0.3.5"); because("transitive dependency of Maven modules to process POM metadata") }}
+         api(libs.errorProneAnnotations) { version { strictly("2.42.0") } } // don't forget to upgrade errorprone in gradlebuild.code-quality.gradle.kts
+         api(libs.fastutil)              { version { strictly("8.5.2") }}
+-        api(libs.gradleFileEvents)      { version { strictly("0.2.8") }}
++        api(libs.gradleFileEvents)      { version { strictly("0.2.8-zyntax.1") }}
+         api(libs.gradleProfiler)        { version { strictly("0.24.0-alpha-1") }}
+         api(libs.develocityTestAnnotation) { version { strictly("2.0.1") }}
+         api(libs.gcs)                   { version { strictly("v1-rev20220705-1.32.1") }}
+@@ -124,7 +124,7 @@ dependencies {
+         api(libs.jakartaActivation)     { version { strictly("2.0.1") }}
+         api(libs.jakartaXmlBind)        { version { strictly("3.0.0") }}
+         //If JANSI is updated run on a windows terminal CMD.EXE to make sure the ansi control characters are not messing up the output
+-        api(libs.jansi)                 { version { strictly("2.4.2") }}
++        api(libs.jansi)                 { version { strictly("2.4.2-zyntax.1") }}
+         api(libs.jatl)                  { version { strictly("0.2.3") }}
+         api(libs.javaPoet)              { version { strictly("1.13.0") } }
+         api(libs.jaxbCore)              { version { strictly(jaxbVersion) }}
+diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java
+index 9681930bc..39f60ec50 100644
+--- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java
++++ b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java
+@@ -23,6 +23,7 @@
+ import org.gradle.internal.watch.registry.FileWatcherRegistry;
+ import org.gradle.internal.watch.registry.FileWatcherUpdater;
+ import org.gradle.internal.watch.registry.WatchMode;
++import org.gradle.internal.watch.vfs.WatchableFileSystems;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -32,7 +33,6 @@
+ import java.io.InterruptedIOException;
+ import java.nio.file.Paths;
+ import java.util.Collection;
+-import java.util.List;
+ import java.util.Optional;
+ import java.util.concurrent.BlockingQueue;
+ import java.util.concurrent.TimeUnit;
+@@ -148,13 +148,13 @@ public void virtualFileSystemContentsChanged(Collection<FileSystemLocationSnapsh
+     }
+ 
+     @Override
+-    public SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, List<File> unsupportedFileSystems) {
+-        return fileWatcherUpdater.updateVfsOnBuildStarted(root, watchMode, unsupportedFileSystems);
++    public SnapshotHierarchy updateVfsOnBuildStarted(SnapshotHierarchy root, WatchMode watchMode, WatchableFileSystems watchableFileSystems) {
++        return fileWatcherUpdater.updateVfsOnBuildStarted(root, watchMode, watchableFileSystems);
+     }
+ 
+     @Override
+-    public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, List<File> unsupportedFileSystems) {
+-        return fileWatcherUpdater.updateVfsBeforeBuildFinished(root, maximumNumberOfWatchedHierarchies, unsupportedFileSystems);
++    public SnapshotHierarchy updateVfsBeforeBuildFinished(SnapshotHierarchy root, int maximumNumberOfWatchedHierarchies, WatchableFileSystems watchableFileSystems) {
++        return fileWatcherUpdater.updateVfsBeforeBuildFinished(root, maximumNumberOfWatchedHierarchies, watchableFileSystems);
+     }
+ 
+     @Override

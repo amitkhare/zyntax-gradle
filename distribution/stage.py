@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -12,14 +13,12 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 
+from targets import load_target
 
 GROUP = "app.zyntax.gradle"
-NP = "0.22-milestone-28-zyntax.1"
-FE = "0.2.7-zyntax.1"
-JANSI = "1.18-zyntax.1"
 
 
-def verify_source_delta(stage, verification, patch):
+def verify_source_delta(stage, verification, patch, wrapper_sha256):
     """Reconstruct the declared delta, without accepting unrelated source inputs."""
     source = stage / "source"
     environment = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
@@ -54,7 +53,7 @@ def verify_source_delta(stage, verification, patch):
             modes[relative] = new_mode
     wrapper = "gradle/wrapper/gradle-wrapper.properties"
     expected[wrapper] = git("show", f"HEAD:{wrapper}") + (
-        b"\ndistributionSha256Sum=7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999\n")
+        f"\ndistributionSha256Sum={wrapper_sha256}\n".encode())
     expected["gradle/verification-metadata.xml"] = verification
     modes.update({wrapper: "100644", "gradle/verification-metadata.xml": "100644"})
     untracked = {os.fsdecode(path) for path in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0") if path}
@@ -106,19 +105,52 @@ def pom(name, version, dependencies):
 
 
 def main():
-    stage, native, jansi = map(lambda value: Path(value).resolve(), sys.argv[1:])
+    stage, native, jansi = map(lambda value: Path(value).resolve(), sys.argv[1:4])
+    target = load_target(sys.argv[4], require_recipe=True)
+    profile = target["componentProfile"]
+    NP = profile["nativePlatform"] + "-zyntax.1"
+    FE = profile["fileEvents"]["version"] + "-zyntax.1"
+    JANSI = profile["jansi"] + "-zyntax.1"
+    file_events_name = profile["fileEvents"]["artifact"]
+    file_events_layout = profile["nativeBuild"]["fileEventsLayout"]
+    if file_events_layout == "integrated":
+        file_events_version_source = "net/rubygrapefruit/platform/internal/jni/FileEventsVersion.java"
+        file_events_fingerprint = profile["nativeBuild"]["fileEventsFingerprint"]
+        file_events_resource = "net/rubygrapefruit/platform/android-aarch64/libnative-platform-file-events.so"
+        file_events_dependencies = [(GROUP, "native-platform", NP)]
+    elif file_events_layout == "standalone":
+        file_events_version_source = "org/gradle/fileevents/internal/FileEventsVersion.java"
+        file_events_fingerprint = profile["fileEvents"]["version"]
+        file_events_resource = "net/rubygrapefruit/platform/aarch64-linux-android/libgradle-fileevents.so"
+        file_events_dependencies = [(GROUP, "native-platform", NP), ("org.slf4j", "slf4j-api", profile["slf4j"])]
+    else:
+        raise ValueError("Unknown file-events source layout")
+    jansi_resource = {
+        "1.18": "META-INF/native/android-aarch64/libjansi.so",
+        "2.4.2": "org/fusesource/jansi/internal/native/Android/arm64/libjansi.so",
+    }[profile["jansi"]]
+    # Artifact basenames are shared across profiles. Check the upstream-generated
+    # identities so a valid but different component build cannot be relabelled.
+    for archive, source, expected in (
+        (native / "sources/native-platform-sources.jar", "net/rubygrapefruit/platform/internal/jni/NativeVersion.java",
+         profile["nativeBuild"]["nativePlatformFingerprint"]),
+        (native / f"sources/{file_events_name}-sources.jar", file_events_version_source, file_events_fingerprint),
+    ):
+        with zipfile.ZipFile(archive) as bundle:
+            match = re.search(r'\bString\s+VERSION\s*=\s*"([^"]+)"', bundle.read(source).decode("utf-8"))
+            if not match or match.group(1) != expected:
+                raise ValueError(f"Native component source identity differs from selected profile: {archive}")
     components = [
         ("native-platform", NP, native / "java/native-platform-android.jar",
          native / "sources/native-platform-sources.jar", [],
          ["net/rubygrapefruit/platform/android-aarch64/libnative-platform.so",
           "net/rubygrapefruit/platform/android-aarch64/libnative-platform-curses.so"]),
-        ("gradle-fileevents", FE, native / "java/gradle-fileevents-java.jar",
-         native / "sources/gradle-fileevents-sources.jar",
-         [(GROUP, "native-platform", NP), ("org.slf4j", "slf4j-api", "1.7.36")],
-         ["net/rubygrapefruit/platform/aarch64-linux-android/libgradle-fileevents.so"]),
+        (file_events_name, FE, native / f"java/{file_events_name}-java.jar",
+         native / f"sources/{file_events_name}-sources.jar", file_events_dependencies,
+         [file_events_resource]),
         ("jansi", JANSI, jansi / f"java/jansi-{JANSI}.jar",
          jansi / f"java/jansi-{JANSI}-sources.jar", [],
-         ["META-INF/native/android-aarch64/libjansi.so"]),
+         [jansi_resource]),
     ]
     records = []
     verification = []
@@ -150,13 +182,13 @@ def main():
 
     copy_tree(native / "licenses", stage / "notices/native-components")
     copy_tree(jansi / "licenses", stage / "notices/jansi")
-    for source, target in (
+    for source, notice_name in (
         (native / "probe/PORT-NOTICE.txt", "native-components/PORT-NOTICE.txt"),
         (native / "ncurses-input.tsv", "native-components/ncurses-input.tsv"),
         (jansi / "PORT-NOTICE.txt", "jansi/PORT-NOTICE.txt"),
         (jansi / "SOURCE-PROVENANCE.properties", "jansi/SOURCE-PROVENANCE.properties"),
     ):
-        write_once(stage / "notices" / target, source.read_bytes())
+        write_once(stage / "notices" / notice_name, source.read_bytes())
 
     # Preserve every upstream byte, header and trust/signature rule. Never generate
     # checksums for unrelated downloads or replace the pristine verification policy.
@@ -178,23 +210,32 @@ def main():
     if path.read_bytes() not in (pristine, generated):
         raise ValueError("Verification metadata has unrelated changes")
     path.write_bytes(generated)
-    patch_path = Path(__file__).with_name("source.patch").resolve()
-    verify_source_delta(stage, generated, patch_path)
+    patch_path = stage / "source.patch"
+    declared_patch = b"".join(Path(__file__).with_name(name).read_bytes() for name in target["recipe"]["patches"])
+    if patch_path.read_bytes() != declared_patch:
+        raise ValueError("Stage source patch differs from the pinned recipe series")
+    revision = subprocess.check_output(["git", "-C", str(source_dir), "rev-parse", "HEAD"], text=True).strip()
+    if revision != target["revision"]:
+        raise ValueError("Stage source revision differs from the pinned target")
+    verify_source_delta(stage, generated, patch_path, target["wrapperSha256"])
     manifest = (json.dumps(records, indent=2) + "\n").encode()
     write_once(stage / "component-inputs.json", manifest)
     provenance = stage / "notices/distribution"
     patch = patch_path.read_bytes()
     write_once(provenance / "source.patch", patch)
+    # Regenerate build metadata only after immutable component bytes, exact Git
+    # revision and complete source delta have all passed their checks above.
+    (provenance / "source-target.json").write_bytes((json.dumps(target, indent=2) + "\n").encode())
     write_once(provenance / "component-inputs.json", manifest)
     (provenance / "SOURCE-BUILD.properties").write_bytes((
-        "upstreamRevision=e5ee1df3d88b8ca3a8074787a94f373e3090e1db\n"
+        f"upstreamRevision={target['revision']}\n"
         f"sourcePatchSha256={hashlib.sha256(patch).hexdigest()}\n"
         "sourceModified=true\nrecipe=distribution/build.sh\n"
-        "task=:distributions-full:binDistributionZip\nversionQualifier=android-1\n"
+        f"task=:distributions-full:binDistributionZip\nversionQualifier=android-{target['recipe']['portRevision']}\n"
         f"buildTimestamp={(stage / 'build-timestamp').read_text().strip()}\n"
-        "wrapperVersion=8.14.2\n"
-        "wrapperSha256=7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999\n"
-        "dependencyVerification=strict\nbuildCache=false\nworkers=2\ngradleHeapMiB=2048\n"
+        f"wrapperVersion={target['wrapperVersion']}\n"
+        f"wrapperSha256={target['wrapperSha256']}\n"
+        "dependencyVerification=strict\nconfigurationCache=upstream\nbuildCache=false\nworkers=2\ngradleHeapMiB=2048\n"
         "componentRepositoryInput=ZYNTAX_GRADLE_COMPONENTS_REPOSITORY\n"
     ).encode())
     print(json.dumps(records, indent=2))

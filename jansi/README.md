@@ -5,6 +5,35 @@ fork. All shipped Java classes are compiled from Jansi 1.18, Jansi Native 1.8 an
 HawtJNI runtime 1.17 sources. One Java 8-compatible JAR embeds the Android aarch64
 JNI library; it has no separate Maven runtime dependencies. No stock JAR is edited.
 
+## Jansi 2.4.2 for the Gradle 9 ports
+
+`build-2.sh` builds `app.zyntax.gradle:jansi:2.4.2-zyntax.1` from exact upstream
+commit `3d2a9788fa48e4cecbbe28279d01111a125d2f66`. Supply `SOURCE_INPUT` as a Git
+cache containing that commit and the same external `NDK_DIR` described below.
+It uses the shared CMake recipe with `JANSI_API=2`; the 1.18 recipe explicitly
+selects API 1. These are different upstream APIs, not interchangeable versions.
+
+The source patch uses the declared Android/arm64 native-resource path, NDK JNI
+headers, and Bionic termios layout/accessors. It preserves the upstream loader
+and rebuilds all Java/JNI source; no desktop JAR/native binary is rewritten.
+`SOURCE-PROVENANCE.properties` records the commit, patch hash, target and NDK.
+The runtime JAR contains only its Android native library plus upstream Java and
+notices. The same small terminal probe compiles against both Jansi APIs.
+
+The first 2.4.2 Android host compilation passed on 2026-09-19 with API 24,
+16 KB LOAD alignment, no RPATH and only Android libc/libm/libdl dependencies.
+Its native SHA-256 is
+`20ab676eaa3d72c3e7e7bb3bf1a542fc02383e7d09b9e854a89708d140f28c78`.
+This is host build evidence only; Android loading/PTY and complete Gradle 9
+distribution qualification are still pending. No Jansi 2 release is published.
+
+The staged source companion now includes the complete build/verifier/probe
+recipe. Final build `build-t3pAZv` passed the same checks: native SHA-256
+`c3e9bdb3d86b9b7c3acb60f75256da4ad9deeeab7d4c7fc2cbd88a311c868a6a`,
+runtime JAR `5c41a3a8bee03f56b0cbe71eedf4e85af71dafa7ee49f3eb0526f989132c6ee4`,
+sources JAR `791a3ab8a0732f97f7bfb7b2576f5d2a755c7bccc72fbf96dbf284adfabab72b`.
+These are the inputs staged for the new distributions, not an Android test result.
+
 ## Build
 
 Use the standalone repository-root `zyntax-gradle-native-builder` image (JDK 17,

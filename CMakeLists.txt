@@ -33,20 +33,33 @@ set_target_properties(ncurses PROPERTIES
 target_include_directories(native-platform-curses PRIVATE "${NCURSES_PREFIX}/include")
 target_link_libraries(native-platform-curses PRIVATE ncurses)
 
-add_library(gradle-fileevents SHARED
-  "${FILE_EVENTS_SOURCE}/src/main/cpp/fileevents_version.cpp"
-  "${FILE_EVENTS_SOURCE}/src/main/cpp/generic_fsnotifier.cpp"
-  "${FILE_EVENTS_SOURCE}/src/main/cpp/jni_support.cpp"
-  "${FILE_EVENTS_SOURCE}/src/main/cpp/linux_fsnotifier.cpp"
-  "${FILE_EVENTS_SOURCE}/src/main/cpp/logging.cpp"
-  "${FILE_EVENTS_SOURCE}/src/main/cpp/services.cpp")
-target_include_directories(gradle-fileevents PRIVATE
-  "${FILE_EVENTS_SOURCE}/src/main/headers"
-  "${FILE_EVENTS_SOURCE}/build/generated/sources/headers/java"
-  "${FILE_EVENTS_SOURCE}/build/generated/sources/headers/version")
-target_link_libraries(gradle-fileevents PRIVATE dl)
+if(FILE_EVENTS_LAYOUT STREQUAL "integrated")
+  set(fe_target native-platform-file-events)
+  set(fe_source "${FILE_EVENTS_SOURCE}/src/file-events")
+  set(fe_version_source file-events-version.cpp)
+  set(fe_jni_headers "${FILE_EVENTS_SOURCE}/build/generated/jni")
+  set(fe_version_headers "${FILE_EVENTS_SOURCE}/build/generated/version/header")
+elseif(FILE_EVENTS_LAYOUT STREQUAL "standalone")
+  set(fe_target gradle-fileevents)
+  set(fe_source "${FILE_EVENTS_SOURCE}/src/main")
+  set(fe_version_source fileevents_version.cpp)
+  set(fe_jni_headers "${FILE_EVENTS_SOURCE}/build/generated/sources/headers/java")
+  set(fe_version_headers "${FILE_EVENTS_SOURCE}/build/generated/sources/headers/version")
+else()
+  message(FATAL_ERROR "FILE_EVENTS_LAYOUT must be integrated or standalone.")
+endif()
+add_library(${fe_target} SHARED
+  "${fe_source}/cpp/${fe_version_source}"
+  "${fe_source}/cpp/generic_fsnotifier.cpp"
+  "${fe_source}/cpp/jni_support.cpp"
+  "${fe_source}/cpp/linux_fsnotifier.cpp"
+  "${fe_source}/cpp/logging.cpp"
+  "${fe_source}/cpp/services.cpp")
+target_include_directories(${fe_target} PRIVATE
+  "${fe_source}/headers" "${fe_jni_headers}" "${fe_version_headers}")
+target_link_libraries(${fe_target} PRIVATE dl)
 
-foreach(target native-platform native-platform-curses gradle-fileevents)
+foreach(target native-platform native-platform-curses ${fe_target})
   set_target_properties(${target} PROPERTIES SKIP_BUILD_RPATH TRUE INSTALL_RPATH "")
   target_compile_features(${target} PRIVATE cxx_std_17)
   target_compile_options(${target} PRIVATE -Wall -Wextra -Wformat=2 -fvisibility=hidden)

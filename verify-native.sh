@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-stage=${1:?Usage: verify-native.sh build-stage}
+stage=${1:?Usage: verify-native.sh build-stage file-events-layout}
+file_events_layout=${2:?Supply the pinned file-events source layout}
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$repo_dir/native-layout.bash"
 ndk_dir=${NDK_DIR:?Supply the external official r29 NDK directory}
 tools="$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
@@ -47,12 +50,11 @@ verify_library libnative-platform.so JNI_OnLoad \
     "$np/net_rubygrapefruit_platform_internal_jni_PosixTypeFunctions.h"
 verify_library libnative-platform-curses.so none \
     "$np/net_rubygrapefruit_platform_internal_jni_TerminfoFunctions.h"
-fe="$stage/file-events/build/generated/sources/headers/java"
-verify_library libgradle-fileevents.so JNI_OnLoad \
-    "$fe/org_gradle_fileevents_internal_AbstractNativeFileEventFunctions.h" \
-    "$fe/org_gradle_fileevents_internal_AbstractNativeFileEventFunctions_NativeFileWatcher.h" \
-    "$fe/org_gradle_fileevents_internal_LinuxFileEventFunctions.h" \
-    "$fe/org_gradle_fileevents_internal_LinuxFileEventFunctions_LinuxFileWatcher.h"
+verify_library "lib$fe_library.so" JNI_OnLoad \
+    "$fe_jni/${fe_jni_package}_AbstractNativeFileEventFunctions.h" \
+    "$fe_jni/${fe_jni_package}_AbstractNativeFileEventFunctions_NativeFileWatcher.h" \
+    "$fe_jni/${fe_jni_package}_LinuxFileEventFunctions.h" \
+    "$fe_jni/${fe_jni_package}_LinuxFileEventFunctions_LinuxFileWatcher.h"
 
 native_version=$(sed -n 's/^#define NATIVE_VERSION "\([0-9a-f]*\)"$/\1/p' "$stage/artifacts/native_platform_version.h")
 [[ $native_version =~ ^[0-9a-f]{64}$ ]]
@@ -60,10 +62,11 @@ np_java=$(javap -constants -classpath "$stage/artifacts/java/native-platform-and
 grep -F "\"$native_version\"" <<<"$np_java" >/dev/null
 "$tools/llvm-strings" "$stage/artifacts/lib/libnative-platform.so" | grep -x "$native_version" >/dev/null
 "$tools/llvm-strings" "$stage/artifacts/lib/libnative-platform-curses.so" | grep -x "$native_version" >/dev/null
-fe_java=$(javap -constants -classpath "$stage/artifacts/java/gradle-fileevents-java.jar" org.gradle.fileevents.internal.FileEventsVersion)
-file_events_version=$(sed -n 's/^#define FILE_EVENTS_VERSION "\([^"]*\)"$/\1/p' "$stage/artifacts/fileevents_version.h")
+fe_java=$(javap -constants -classpath "$stage/artifacts/java/$fe_artifact-java.jar" "$fe_version_class")
+file_events_version=$(sed -n "s/^#define $fe_version_macro \"\([^\"]*\)\"$/\1/p" "$stage/artifacts/fileevents_version.h")
 test -n "$file_events_version"
+if [[ $file_events_layout == integrated ]]; then [[ $file_events_version =~ ^[0-9a-f]{64}$ ]]; fi
 grep -F "\"$file_events_version\"" <<<"$fe_java" >/dev/null
-"$tools/llvm-strings" "$stage/artifacts/lib/libgradle-fileevents.so" | grep -Fx "$file_events_version" >/dev/null
+"$tools/llvm-strings" "$stage/artifacts/lib/lib$fe_library.so" | grep -Fx "$file_events_version" >/dev/null
 printf 'native-platform JNI=%s; file-events=%s\n' "$native_version" "$file_events_version"
 printf 'JNI exports and paired versions verified; Android runtime loading is not tested.\n'

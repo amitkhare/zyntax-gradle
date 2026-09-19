@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/gradle/gradle.git",
+  "componentProfiles": {
+    "9": {
+      "nativePlatform": "0.22-milestone-29",
+      "nativeBuild": {
+        "nativePlatformRevision": "e999afaf8692fb66e9016e0a3b0519a05981753e",
+        "nativePlatformFingerprint": "3f2b628b8086d4aca5a449fe32f919e2cfe90b5fb63841379e3383b2856da5bb",
+        "fileEventsLayout": "standalone",
+        "fileEventsRevision": "cd90e974edf4adf83a1b4503e0af0a7cd220da55",
+        "nativePlatformBootstrap": "8.14.3",
+        "fileEventsBootstrap": "8.13",
+        "appleSysctlPatch": false
+      },
+      "fileEvents": {
+        "group": "org.gradle.fileevents",
+        "artifact": "gradle-fileevents",
+        "version": "0.2.8"
+      },
+      "jansi": "2.4.2",
+      "slf4j": "2.0.17"
+    },
+    "8.11": {
+      "nativePlatform": "0.22-milestone-26",
+      "nativeBuild": {
+        "nativePlatformRevision": "7d95ae055e509163ce7950f1a38c66d342ee77ad",
+        "nativePlatformFingerprint": "99c99c0bd6b1f45988f5ba04773bbc1fe939c0e64794aee590fd40cee6dd7cef",
+        "fileEventsRevision": "7d95ae055e509163ce7950f1a38c66d342ee77ad",
+        "fileEventsFingerprint": "100fb08df4bc3b14c8652ba06237920a3bd2aa13389f12d3474272988ae205f9",
+        "fileEventsLayout": "integrated",
+        "nativePlatformBootstrap": "7.5",
+        "fileEventsBootstrap": "7.5",
+        "appleSysctlPatch": false
+      },
+      "fileEvents": {
+        "group": "net.rubygrapefruit",
+        "artifact": "file-events",
+        "version": "0.22-milestone-26"
+      },
+      "jansi": "1.18",
+      "slf4j": "1.7.36"
+    },
+    "8.14": {
+      "nativePlatform": "0.22-milestone-28",
+      "nativeBuild": {
+        "nativePlatformRevision": "87f4647e90db6006bf357db0ba7fa29925dcc32e",
+        "nativePlatformFingerprint": "d9b662c5bbedb6418f2007170aa8ed97211391cd673d3d2a6be45c929c7f0dd6",
+        "fileEventsLayout": "standalone",
+        "fileEventsRevision": "08be35d81f4d6336ce4666122c0c72a97b11a7e9",
+        "nativePlatformBootstrap": "7.5",
+        "fileEventsBootstrap": "8.10.2",
+        "appleSysctlPatch": true
+      },
+      "fileEvents": {
+        "group": "org.gradle.fileevents",
+        "artifact": "gradle-fileevents",
+        "version": "0.2.7"
+      },
+      "jansi": "1.18",
+      "slf4j": "1.7.36"
+    }
+  },
+  "targets": {
+    "8.11.1": {
+      "revision": "481cb05a490e0ef9f8620f7873b83bd8a72e7c39",
+      "wrapperVersion": "8.11",
+      "wrapperSha256": "57dafb5c2622c6cc08b993c85b7c06956a2f53536432a30ead46166dbca0f1e9",
+      "components": "8.11",
+      "dependencyFile": "subprojects/distributions-dependencies/build.gradle.kts",
+      "distributionProjectPath": "subprojects/distributions-full",
+      "recipe": {"patches": ["source-8.11.patch"], "portRevision": 1}
+    },
+    "8.14.3": {
+      "revision": "e5ee1df3d88b8ca3a8074787a94f373e3090e1db",
+      "wrapperVersion": "8.14.2",
+      "wrapperSha256": "7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999",
+      "components": "8.14",
+      "distributionProjectPath": "packaging/distributions-full",
+      "dependencyFile": "packaging/distributions-dependencies/build.gradle.kts",
+      "recipe": {
+        "patches": ["source.patch"],
+        "portRevision": 1
+      }
+    },
+    "9.3.1": {
+      "revision": "44f4e8d3122ee6e7cbf5a248d7e20b4ca666bda3",
+      "wrapperVersion": "9.3.0-rc-3",
+      "wrapperSha256": "d18ae4e38c4572d1e1546d585110c807f13476223e063b40324f891bf7b5e39c",
+      "components": "9",
+      "distributionProjectPath": "packaging/distributions-full",
+      "dependencyFile": "packaging/distributions-dependencies/build.gradle.kts",
+      "sourceBuildDaemonJava": 17,
+      "recipe": {"patches": ["source-common-9.patch", "source-9.3.patch"], "portRevision": 1}
+    },
+    "9.4.1": {
+      "revision": "2d6327017519d23b96af35865dc997fcb544fb40",
+      "wrapperVersion": "9.4.0",
+      "wrapperSha256": "60ea723356d81263e8002fec0fcf9e2b0eee0c0850c7a3d7ab0a63f2ccc601f3",
+      "components": "9",
+      "distributionProjectPath": "packaging/distributions-full",
+      "dependencyFile": "packaging/distributions-dependencies/build.gradle.kts",
+      "sourceBuildDaemonJava": 17,
+      "recipe": {"patches": ["source-common-9.patch", "source-9.4.patch"], "portRevision": 1}
+    },
+    "9.6.0": {
+      "revision": "3f750f03d77e42327c5f9fcb9992110088330a32",
+      "wrapperVersion": "9.6.0-rc-3",
+      "wrapperSha256": "6e3106016ed5b19bfdef316441777a132cda19e167ad90015e053db423fb5dd6",
+      "components": "9",
+      "distributionProjectPath": "packaging/distributions-full",
+      "dependencyFile": "gradle/dependency-management/distribution.versions.toml",
+      "sourceBuildDaemonJava": 17,
+      "recipe": {"patches": ["source-common-9.patch", "source-9.6.patch"], "portRevision": 1}
+    },
+    "9.7.1": {
+      "revision": "92f0512e7f06d84621afba191f75e265363890cf",
+      "wrapperVersion": "9.7.0",
+      "wrapperSha256": "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae",
+      "components": "9",
+      "distributionProjectPath": "packaging/distributions-full",
+      "dependencyFile": "gradle/dependency-management/distribution.versions.toml",
+      "sourceBuildDaemonJava": 25,
+      "recipe": {"patches": ["source-common-9.patch", "source-9.7.patch"], "portRevision": 1}
+    }
+  }
+}

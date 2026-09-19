@@ -1,0 +1,11 @@
+Zyntax Android ARM64 source port of Jansi 2.4.2
+
+Based on https://github.com/fusesource/jansi at
+3d2a9788fa48e4cecbbe28279d01111a125d2f66 (Apache-2.0).
+
+The source-built Java companion declares Android/arm64 resource identity without
+changing JVM OS properties. Native code uses the NDK target JNI declarations and
+Bionic's POSIX termios speed accessors, preserving the line-discipline byte.
+The upstream Java and native sources are compiled together; no upstream binaries
+are replaced or repackaged. Android API 24, 16 KB ELF alignment, dynamic Bionic.
+Source artifacts include the exact port patch, recipe and upstream license.
