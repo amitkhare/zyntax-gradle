@@ -29,12 +29,22 @@ def load_target(version, require_recipe=False):
             raise ValueError("Unknown source distribution project")
         if not isinstance(recipe["portRevision"], int) or recipe["portRevision"] < 1:
             raise ValueError("Invalid port revision")
+        # A downstream release is distinct from both stock Gradle and other
+        # ports in Gradle's daemon/version caches. Do not use a prerelease label
+        # for a port of a stable upstream release: it fails exact-minimum checks.
+        target["runtimeVersion"] = f"{version}.{recipe['portRevision']}"
         if not recipe["patches"] or len(recipe["patches"]) != len(set(recipe["patches"])):
             raise ValueError("Empty or duplicate source patch series")
         for name in recipe["patches"]:
             if not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*\.patch", name) or not (MANIFEST.parent / name).is_file():
                 raise ValueError(f"Invalid or missing source patch: {name}")
     return target
+
+
+def distribution_version(target, timestamp):
+    if not re.fullmatch(r"[0-9]{14}\+0000", timestamp):
+        raise ValueError("Invalid distribution build timestamp")
+    return f"{target['version']}-android-{target['recipe']['portRevision']}-{timestamp}"
 
 
 def native_build_fields(profile_name):
@@ -128,7 +138,8 @@ def main():
             audit_source(args.source, target)
         if args.recipe:
             print(target["revision"], target["wrapperVersion"], target["wrapperSha256"],
-                  target["recipe"]["portRevision"], " ".join(target["recipe"]["patches"]), sep="\t")
+                  target["recipe"]["portRevision"], target["runtimeVersion"],
+                  " ".join(target["recipe"]["patches"]), sep="\t")
         else:
             print(f"{version}: {'source audited' if args.source else 'source pinned'}; "
                   f"{'recipe present' if 'recipe' in target else 'port pending'}")

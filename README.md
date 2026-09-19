@@ -26,6 +26,11 @@ source-build bootstrap and native dependencies for Gradle 8.11.1, 8.14.3,
 audits those immutable source objects without downloading or running Gradle.
 Pins are build inputs, **not additional qualified releases**. The existing
 8.14.3 release remains unchanged while the other ports are built and verified.
+New source recipes use a distinct stable downstream runtime version such as
+`9.6.0.1` (upstream 9.6.0, Android revision 1), with separate Android-branded
+archives and full provenance. This preserves AGP minimum checks and isolates
+daemon/version caches from stock Gradle. The future 8.14.3 recipe is revision 2;
+the already-qualified revision-1 artifact is not rebuilt or relabelled.
 
 The shared native recipe accepts `COMPONENT_PROFILE=8.11`, `8.14` (default) or `9`.
 Profile 9 builds native-platform milestone 29 and file-events 0.2.8 from their

@@ -1,0 +1,115 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import org.gradle.internal.file.FileMetadataAccessor
+import org.gradle.internal.file.FileSystem
+import org.gradle.internal.file.FileType
+import org.gradle.internal.nativeintegration.NativeCapabilities
+import org.gradle.internal.nativeintegration.ProcessEnvironment
+import org.gradle.internal.nativeintegration.processenvironment.NativePlatformBackedProcessEnvironment
+import org.gradle.internal.nativeintegration.filesystem.services.NativePlatformBackedFileMetadataAccessor
+import org.gradle.internal.nativeintegration.services.NativeServices
+import org.gradle.internal.watch.vfs.BuildLifecycleAwareVirtualFileSystem
+import org.gradle.internal.watch.registry.WatchMode
+
+plugins { id 'java' }
+
+def phase = providers.gradleProperty('probePhase').get()
+assert phase in ['1', '2']
+def configuration = new JsonSlurper().parse(file(providers.gradleProperty('probeConfiguration').get()))
+assert gradle.gradleVersion == configuration.expectedGradleVersion
+assert gradle.gradleHomeDir.canonicalFile == file(configuration.distribution).canonicalFile
+assert gradle.startParameter.watchFileSystemMode == WatchMode.DEFAULT : 'Watching mode was explicitly overridden'
+def evidence = file(providers.gradleProperty('probeEvidenceDir').get())
+assert evidence.isDirectory()
+def registry = NativeServices.instance
+def capabilities = registry.get(NativeCapabilities)
+assert capabilities.useNativeIntegrations()
+assert capabilities.useFileSystemWatching()
+def process = registry.get(ProcessEnvironment)
+assert process instanceof NativePlatformBackedProcessEnvironment
+def daemonPid = process.pid
+assert daemonPid == ProcessHandle.current().pid()
+assert process.processDir.canonicalFile == projectDir.canonicalFile
+assert System.getenv('ZYNTAX_NATIVE_INTEGRATION_PHASE') == phase
+def vfs = services.get(BuildLifecycleAwareVirtualFileSystem)
+
+// Check before Gradle snapshots this build's task inputs: this must be old state.
+if (phase == '2') {
+    def previous = new JsonSlurper().parse(new File(evidence, 'daemon-1.json'))
+    assert daemonPid == previous.pid
+    def retained = vfs.findSnapshot(file('stable.txt').absolutePath)
+    assert retained.present : 'Unchanged input snapshot was not retained between builds'
+    assert retained.get().hash.toString() == previous.stableHash
+    assert !vfs.findSnapshot(file('changed.txt').absolutePath).present : 'Changed input was not invalidated by an event'
+}
+
+def selectedLibrary = { String name ->
+    def path = file(configuration[name])
+    assert path.isFile() : "Missing exact fixture dependency: ${path}"
+    path
+}
+dependencies {
+    testImplementation files(
+        selectedLibrary('junit'),
+        selectedLibrary('hamcrest'),
+        selectedLibrary('nativePlatform')
+    )
+}
+
+['stable', 'changed'].each { String name ->
+    tasks.register("copy${name.capitalize()}") {
+        def source = file("${name}.txt")
+        def target = layout.buildDirectory.file("copied/${name}.txt")
+        inputs.file(source)
+        outputs.file(target)
+        doLast {
+            target.get().asFile.parentFile.mkdirs()
+            target.get().asFile.bytes = source.bytes
+        }
+    }
+}
+
+tasks.named('test', Test) {
+    useJUnit()
+    maxHeapSize = '128m'
+    maxParallelForks = 1
+    inputs.property('probePhase', phase)
+    systemProperty 'probe.phase', phase
+    systemProperty 'probe.nativePlatform', configuration.nativePlatform
+    systemProperty 'probe.daemonPid', daemonPid.toString()
+    systemProperty 'probe.projectDir', projectDir.absolutePath
+    systemProperty 'probe.evidenceDir', evidence.absolutePath
+    // Normal Gradle Test worker bootstrap remains NativeServicesMode.DISABLED.
+    // The test itself uses NP's API in the application classloader.
+}
+
+tasks.register('probe') {
+    dependsOn 'test', 'copyStable', 'copyChanged'
+    doLast {
+        assert vfs.isWatchingAnyLocations()
+        def filesystem = registry.get(FileSystem)
+        def metadata = registry.get(FileMetadataAccessor)
+        assert metadata instanceof NativePlatformBackedFileMetadataAccessor
+        def scratch = layout.buildDirectory.file('native-mode.txt').get().asFile
+        scratch.text = 'native-mode\n'
+        filesystem.chmod(scratch, 0600)
+        def info = metadata.stat(scratch)
+        assert info.type == FileType.RegularFile
+        assert info.length == scratch.length()
+        assert (filesystem.getUnixMode(scratch) & 0777) == 0600
+        def stable = vfs.findSnapshot(file('stable.txt').absolutePath)
+        assert stable.present
+        def result = [pid: daemonPid, phase: phase, nativeServices: true,
+            fileWatching: true, environment: true, nativeMode: '0600',
+            stableHash: stable.get().hash.toString()]
+        new File(evidence, "daemon-${phase}.json").text = JsonOutput.toJson(result)
+        new File(evidence, "ready-${phase}").createNewFile()
+        def release = new File(evidence, "release-${phase}")
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15)
+        while (!release.isFile() && System.nanoTime() < deadline) {
+            Thread.sleep(25)
+        }
+        assert release.isFile() : 'Client diagnostic handshake timed out'
+        println "NATIVE_DAEMON_PASS phase=${phase} pid=${daemonPid}"
+    }
+}

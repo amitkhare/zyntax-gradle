@@ -1,5 +1,5 @@
 diff --git a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
-index 8ee6fe7d6..2ce9878a3 100644
+index 8ee6fe7d6416f036ffb61108d28634fce4065a5b..bffd48a48fbb87f77a8d56f626f2bb426c8e785e 100644
 --- a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
 +++ b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
 @@ -16,7 +16,6 @@
@@ -10,7 +10,8 @@ index 8ee6fe7d6..2ce9878a3 100644
  import gradlebuild.basics.kotlindsl.configureKotlinCompilerForGradleBuild
  import gradlebuild.basics.repoRoot
  import gradlebuild.basics.tasks.PackageListGenerator
-@@ -322,10 +321,7 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
+@@ -322,10 +321,8 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
++    val androidDistributionVersion = providers.gradleProperty("androidDistributionVersion")
      val zipRootFolder = if (normalized) {
          gradleModule.identity.version.map { "gradle-${it.baseVersion.version}" }
      } else {
@@ -18,7 +19,7 @@ index 8ee6fe7d6..2ce9878a3 100644
 -            if (buildVersionQualifier.isPresent) it.replace("-${buildVersionQualifier.get()}", "")
 -            else it
 -        }
-+        gradleModule.identity.version.map { "gradle-${it.version}" }
++        androidDistributionVersion.map { "gradle-$it" }
      }
  
      val installation = tasks.register<Sync>("${name}Installation") {
@@ -27,7 +28,7 @@ index 8ee6fe7d6..2ce9878a3 100644
          archiveBaseName = "gradle"
          archiveClassifier = name
 -        archiveVersion = gradleModule.identity.version.map { it.baseVersion.version }
-+        archiveVersion = gradleModule.identity.version.map { if (normalized) it.baseVersion.version else it.version }
++        archiveVersion = if (normalized) gradleModule.identity.version.map { it.baseVersion.version } else androidDistributionVersion
  
          destinationDirectory = project.layout.buildDirectory.dir(disDir)
  
@@ -39,6 +40,15 @@ index 8ee6fe7d6..2ce9878a3 100644
          }
      }
  
+diff --git a/version.txt b/version.txt
+index 4a3e1cf63c27ea3d54bae01cbca004e2402b76ad..395d1b1c3e4585826ad786295dea11f4daa05954 100644
+--- a/version.txt
++++ b/version.txt
+@@ -1 +1 @@
+-9.6.0
+\ No newline at end of file
++9.6.0.1
+\ No newline at end of file
 diff --git a/gradle/dependency-management/distribution.versions.toml b/gradle/dependency-management/distribution.versions.toml
 index 7661a0433..db1670fe3 100644
 --- a/gradle/dependency-management/distribution.versions.toml

@@ -13,7 +13,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 
-from targets import load_target
+from targets import distribution_version, load_target
 
 GROUP = "app.zyntax.gradle"
 APACHE_2 = ("Apache License, Version 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt")
@@ -242,9 +242,11 @@ def main():
     write_once(provenance / "component-inputs.json", manifest)
     (provenance / "SOURCE-BUILD.properties").write_bytes((
         f"upstreamRevision={target['revision']}\n"
+        f"upstreamVersion={target['version']}\nruntimeVersion={target['runtimeVersion']}\n"
         f"sourcePatchSha256={hashlib.sha256(patch).hexdigest()}\n"
         "sourceModified=true\nrecipe=distribution/build.sh\n"
-        f"task=:distributions-full:binDistributionZip\nversionQualifier=android-{target['recipe']['portRevision']}\n"
+        "task=:distributions-full:binDistributionZip\nfinalRelease=true\n"
+        f"distributionVersion={distribution_version(target, (stage / 'build-timestamp').read_text().strip())}\n"
         f"buildTimestamp={(stage / 'build-timestamp').read_text().strip()}\n"
         f"wrapperVersion={target['wrapperVersion']}\n"
         f"wrapperSha256={target['wrapperSha256']}\n"

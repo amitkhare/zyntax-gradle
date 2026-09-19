@@ -1,0 +1,48 @@
+import net.rubygrapefruit.platform.Native;
+import net.rubygrapefruit.platform.file.FileInfo;
+import net.rubygrapefruit.platform.file.PosixFiles;
+import org.junit.Test;
+
+import java.io.File;
+import java.net.URL;
+import java.net.JarURLConnection;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+
+import static org.junit.Assert.*;
+
+public class NativeWorkerTest {
+    @Test
+    public void pairedAndroidResourceExecutesInOrdinaryTestWorker() throws Exception {
+        String phase = System.getProperty("probe.phase");
+        File project = new File(System.getProperty("probe.projectDir"));
+        File extract = new File(project, "build/worker-native-" + phase);
+        assertTrue(extract.mkdirs());
+        assertNotNull(System.getProperty("org.gradle.test.worker"));
+        URL resource = Native.class.getResource(
+            "/net/rubygrapefruit/platform/android-aarch64/libnative-platform.so");
+        assertNotNull(resource);
+        assertEquals("jar", resource.getProtocol());
+        File owner = new File(((JarURLConnection) resource.openConnection()).getJarFileURL().toURI());
+        assertEquals(new File(System.getProperty("probe.nativePlatform")).getCanonicalFile(),
+            owner.getCanonicalFile());
+        ${NATIVE_INITIALIZE} // Includes the genuine Java/JNI version check.
+        net.rubygrapefruit.platform.Process process = ${NATIVE_ACCESS}.get(net.rubygrapefruit.platform.Process.class);
+        long pid = process.getProcessId();
+        assertEquals(ProcessHandle.current().pid(), pid);
+        assertNotEquals(Long.parseLong(System.getProperty("probe.daemonPid")), pid);
+        assertEquals(project.getCanonicalFile(), process.getWorkingDirectory().getCanonicalFile());
+        assertEquals(phase, process.getEnvironmentVariable("ZYNTAX_NATIVE_INTEGRATION_PHASE"));
+        PosixFiles posix = ${NATIVE_ACCESS}.get(PosixFiles.class);
+        File scratch = new File(extract, "mode.txt");
+        Files.write(scratch.toPath(), "worker-native\n".getBytes(StandardCharsets.UTF_8));
+        posix.setMode(scratch, 0600);
+        assertEquals(FileInfo.Type.File, posix.stat(scratch).getType());
+        assertEquals(scratch.length(), posix.stat(scratch).getSize());
+        assertEquals(0600, posix.getMode(scratch) & 0777);
+        String result = "{\"pid\":" + pid + ",\"phase\":\"" + phase
+            + "\",\"directJni\":true,\"environment\":true,\"nativeMode\":\"0600\"}";
+        Files.write(new File(System.getProperty("probe.evidenceDir"), "worker-" + phase + ".json").toPath(),
+            result.getBytes(StandardCharsets.UTF_8));
+    }
+}

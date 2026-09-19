@@ -67,7 +67,7 @@ index 5731f309be78db76a9bafb55f83ee53ad9e55dbc..17eb40b0b662b194996f98c7b440515f
      val plexusCipher = "org.sonatype.plexus:plexus-cipher"
      val plexusClassworlds = "org.codehaus.plexus:plexus-classworlds"
 diff --git a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
-index 5076339c3b73314691fa6fb319010a4d19ad778c..29c9cb046754ca69fc6ce20f38a4805f4d88fede 100644
+index 5076339c3b73314691fa6fb319010a4d19ad778c..29438e49a3e1b336d47c090cf4b52c729a41d3c4 100644
 --- a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
 +++ b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
 @@ -16,7 +16,6 @@
@@ -78,7 +78,8 @@ index 5076339c3b73314691fa6fb319010a4d19ad778c..29c9cb046754ca69fc6ce20f38a4805f
  import gradlebuild.basics.kotlindsl.configureKotlinCompilerForGradleBuild
  import gradlebuild.basics.tasks.ClasspathManifest
  import gradlebuild.basics.tasks.PackageListGenerator
-@@ -268,10 +267,7 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
+@@ -268,10 +267,8 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
++    val androidDistributionVersion = providers.gradleProperty("androidDistributionVersion")
      val zipRootFolder = if (normalized) {
          moduleIdentity.version.map { "gradle-${it.baseVersion.version}" }
      } else {
@@ -86,7 +87,7 @@ index 5076339c3b73314691fa6fb319010a4d19ad778c..29c9cb046754ca69fc6ce20f38a4805f
 -            if (buildVersionQualifier.isPresent) it.replace("-${buildVersionQualifier.get()}", "")
 -            else it
 -        }
-+        moduleIdentity.version.map { "gradle-${it.version}" }
++        androidDistributionVersion.map { "gradle-$it" }
      }
  
      val installation = tasks.register<Sync>("${name}Installation") {
@@ -95,7 +96,7 @@ index 5076339c3b73314691fa6fb319010a4d19ad778c..29c9cb046754ca69fc6ce20f38a4805f
          archiveBaseName = "gradle"
          archiveClassifier = name
 -        archiveVersion = moduleIdentity.version.map { it.baseVersion.version }
-+        archiveVersion = moduleIdentity.version.map { if (normalized) it.baseVersion.version else it.version }
++        archiveVersion = if (normalized) moduleIdentity.version.map { it.baseVersion.version } else androidDistributionVersion
  
          destinationDirectory = project.layout.buildDirectory.dir(disDir)
  
@@ -107,6 +108,13 @@ index 5076339c3b73314691fa6fb319010a4d19ad778c..29c9cb046754ca69fc6ce20f38a4805f
          }
      }
  
+diff --git a/version.txt b/version.txt
+index 0d84cf39ee51b0bbd8f887c3159e73b170d5c535..ce220c81dce48f1aea5c78e7a541e20219f52a50 100644
+--- a/version.txt
++++ b/version.txt
+@@ -1 +1 @@
+-8.14.3
++8.14.3.2
 diff --git a/packaging/distributions-dependencies/build.gradle.kts b/packaging/distributions-dependencies/build.gradle.kts
 index aa8d03e3d7572e977fc61a7c743731f1c863ffc5..8d27e4d0cba18d2c40f7d125d17841978849efdf 100644
 --- a/packaging/distributions-dependencies/build.gradle.kts

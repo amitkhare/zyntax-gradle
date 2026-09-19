@@ -1,10 +1,10 @@
 # Android-qualified Gradle distribution
 
-This recipe source-builds exact Gradle 8.14.3 commit
-`e5ee1df3d88b8ca3a8074787a94f373e3090e1db`, using the upstream
-`:distributions-full:binDistributionZip` task. Host source compilation, archive
-checks and focused Android client/daemon/worker/VFS integration passed; the tested
-scope and remaining limitations are below.
+The existing Gradle 8.14.3 release passed source compilation, archive checks and
+focused Android client/daemon/worker/VFS integration; its immutable evidence is
+below. Current recipes build the exact commits in `targets.json` with upstream's
+`:distributions-full:binDistributionZip` task. The new release-identity contract
+and additional versions are not qualified merely by preparing their recipes.
 Nothing here modifies an installed Gradle, its extraction cache, a project's
 wrapper, or app/SDK source.
 
@@ -25,7 +25,32 @@ than requiring that cache's HEAD to change, and records the exact target and
 combined patch in the output notices. Source-input and strict dependency
 verification remain enabled. New target names do not imply published support.
 The shared Gradle 9 native components and Jansi 2.4.2 have passed source compilation
-and host ELF/JNI checks; complete Gradle 9 distribution/runtime checks remain pending.
+and host ELF/JNI checks. The 9.7.1 candidate passed complete source compilation,
+upstream license generation and ZIP/receipt/component verification in 10m19s
+(978 tasks). Its candidate SHA-256 is
+`6fae884f92e9be48fc696a94ee308bad6fac0c88824455a2c31da2a107b0bfc4`
+(151,523,711 bytes); it is not published. Android runtime checks and release
+identity qualification remain pending. That initial candidate used a prerelease
+runtime qualifier and is retained as source-build evidence, not a final release.
+
+### Runtime identity and archive identity
+
+New stable ports use a fourth numeric component, for example `9.6.0.1` means
+upstream `9.6.0`, Android port revision `1`. Gradle's native version parser supports
+this format: it sorts above `9.6.0` and below `9.6.1`, passes an exact-minimum AGP
+check, and keeps daemon/version caches distinct from stock Gradle and other ports.
+The declared source patch changes `version.txt`; `finalRelease=true` produces a
+non-snapshot receipt. No version-check override or runtime version spoof is used.
+Archive/root labels retain `9.6.0-android-1-<timestamp>` independently, and notices
+record both identities, source commit, complete patch and component checksums.
+
+The qualified historical 8.14.3 port remains unchanged and reusable. Its future
+source recipe is revision 2 (`8.14.3.2`); this does not relabel or republish the
+existing revision-1 ZIP. A new recipe is not a new qualification result.
+Explicit Wrapper generation for a custom port requires its published distribution
+URL and checksum; an Android port is not hosted at `services.gradle.org`.
+These build recipes and the launcher never invoke Wrapper generation in a user's
+project or modify that project's distribution URL.
 
 Build dependency caches are shared across these serial source builds at
 `/work/gradle-native/gradle-home`; `BUILD_GRADLE_USER_HOME` can select another
@@ -55,7 +80,7 @@ docker run --rm \
 
 `prepare` as the script argument only clones and patches the source. A fresh
 Linux checkout lives under
-`/work/gradle-native/distribution/8.14.3-android.1/source`. Rerunning the command
+`/work/gradle-native/distribution/8.14.3-android.2/source`. Rerunning the command
 resumes that stage with the shared build cache and its recorded timestamp. Changed
 patch/component inputs require a fresh `WORK_DIR` under that distribution directory.
 No old stage is deleted automatically.
@@ -100,9 +125,10 @@ explicitly retained. No unrelated dependency is automatically trusted.
 
 The small source patch changes component coordinates/versions and the restricted
 repository, resolves Jansi through the native component's declared Android identity,
-and preserves upstream's qualified version in ZIP names/root folders. Runtime
-identity uses the supported `versionQualifier=android-1` and recorded `buildTimestamp`
-inputs. This is not a stock 8.14.3 ZIP with replaced libraries or an OS spoof.
+and assigns a distinct branded ZIP/root through the source packaging API. Runtime
+identity is the declared numeric downstream version, using the supported
+`finalRelease` and recorded `buildTimestamp` inputs. This is not a stock ZIP with
+replaced libraries or an OS spoof.
 
 Default watching includes F2FS and resolves support at the nearest mounted file
 system. Supported nested mounts remain eligible beneath unsupported ancestors;
@@ -117,6 +143,9 @@ component hash manifest accompany the distribution through its source packaging
 specification. The upstream commit identifies the base, not unmodified Gradle.
 The binary ZIP does not contain component source JARs; these are separate release
 companions, with coverage described in [NOTICE.md](../NOTICE.md).
+The reusable [headless qualification fixture](tests/android-native/README.md)
+checks new ports' actual client/daemon/worker JNI and two-build VFS behavior.
+Its host-only contract checks are not Android runtime qualification.
 Ncurses remains an explicit app-private terminal dependency, not a
 bundled system library. Combined native-component device probes passed, including
 real Jansi PTY/termios operations.

@@ -61,7 +61,7 @@ index f1404036b..64755538e 100644
          api(libs.javaPoet)              { version { strictly("1.13.0") } }
          api(libs.jaxbCore)              { version { strictly(jaxbVersion) }}
 diff --git a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
-index 79d238720..ad47cac9c 100644
+index 79d238720a9dafb23ae1a04abbf8f98067ceb556..b13d9f84d3e3d29a84c5d9341995ef5442b4bc63 100644
 --- a/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
 +++ b/build-logic/packaging/src/main/kotlin/gradlebuild.distributions.gradle.kts
 @@ -16,7 +16,6 @@
@@ -72,7 +72,8 @@ index 79d238720..ad47cac9c 100644
  import gradlebuild.basics.kotlindsl.configureKotlinCompilerForGradleBuild
  import gradlebuild.basics.tasks.PackageListGenerator
  import gradlebuild.configureAsApiElements
-@@ -290,10 +289,7 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
+@@ -290,10 +289,8 @@ fun configureDistribution(name: String, distributionSpec: CopySpec, buildDistLif
++    val androidDistributionVersion = providers.gradleProperty("androidDistributionVersion")
      val zipRootFolder = if (normalized) {
          gradleModule.identity.version.map { "gradle-${it.baseVersion.version}" }
      } else {
@@ -80,7 +81,7 @@ index 79d238720..ad47cac9c 100644
 -            if (buildVersionQualifier.isPresent) it.replace("-${buildVersionQualifier.get()}", "")
 -            else it
 -        }
-+        gradleModule.identity.version.map { "gradle-${it.version}" }
++        androidDistributionVersion.map { "gradle-$it" }
      }
  
      val installation = tasks.register<Sync>("${name}Installation") {
@@ -89,7 +90,7 @@ index 79d238720..ad47cac9c 100644
          archiveBaseName = "gradle"
          archiveClassifier = name
 -        archiveVersion = gradleModule.identity.version.map { it.baseVersion.version }
-+        archiveVersion = gradleModule.identity.version.map { if (normalized) it.baseVersion.version else it.version }
++        archiveVersion = if (normalized) gradleModule.identity.version.map { it.baseVersion.version } else androidDistributionVersion
  
          destinationDirectory = project.layout.buildDirectory.dir(disDir)
  
@@ -101,6 +102,13 @@ index 79d238720..ad47cac9c 100644
          }
      }
  
+diff --git a/version.txt b/version.txt
+index ccfb75e5120ed473804d98ac1a197bf12c2815e2..4a4dca3b48f6f873fa0cc27694e17380c6db461a 100644
+--- a/version.txt
++++ b/version.txt
+@@ -1 +1 @@
+-9.4.1
++9.4.1.1
 diff --git a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java b/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java
 index 9681930bc..39f60ec50 100644
 --- a/platforms/core-execution/file-watching/src/main/java/org/gradle/internal/watch/registry/impl/DefaultFileWatcherRegistry.java

@@ -4,7 +4,7 @@ set -euo pipefail
 recipe_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 version=${GRADLE_VERSION:-8.14.3}
 recipe_fields=$(python3 "$recipe_dir/targets.py" "$version" --recipe)
-IFS=$'\t' read -r revision wrapper_version wrapper_sha256 port_revision patch_names <<<"$recipe_fields"
+IFS=$'\t' read -r revision wrapper_version wrapper_sha256 port_revision runtime_version patch_names <<<"$recipe_fields"
 work_dir=${WORK_DIR:-/work/gradle-native/distribution/$version-android.$port_revision}
 source_input=${SOURCE_INPUT:-/work/gradle-native/gradle}
 mode=${1:-build}
@@ -24,7 +24,7 @@ if [[ ! -d $work_dir/source ]]; then
 fi
 source_dir="$work_dir/source"
 test "$(git -C "$source_dir" rev-parse HEAD)" = "$revision"
-test "$(tr -d '\r\n' < "$source_dir/version.txt")" = "$version"
+test "$(git -C "$source_dir" show HEAD:version.txt | tr -d '\r\n')" = "$version"
 patch_input=$(mktemp "$work_dir/source-patch-XXXXXX")
 for patch_name in $patch_names; do
     cat "$recipe_dir/$patch_name" >> "$patch_input"
@@ -40,6 +40,7 @@ else
     printf '%s\n' "$patch_sha256" > "$work_dir/source-patch.sha256"
 fi
 mv "$patch_input" "$work_dir/source.patch"
+test "$(tr -d '\r\n' < "$source_dir/version.txt")" = "$runtime_version"
 
 wrapper="$source_dir/gradle/wrapper/gradle-wrapper.properties"
 grep -Fx "distributionUrl=https\\://services.gradle.org/distributions/gradle-$wrapper_version-bin.zip" "$wrapper" >/dev/null
@@ -53,6 +54,7 @@ if [[ ! -f $work_dir/build-timestamp ]]; then
     printf '%s\n' "$timestamp" > "$work_dir/build-timestamp"
 fi
 timestamp=$(<"$work_dir/build-timestamp")
+distribution_version="$version-android-$port_revision-$timestamp"
 printf 'Prepared isolated source: %s\n' "$source_dir"
 [[ $mode == build ]] || exit 0
 
@@ -68,7 +70,8 @@ if [[ ${RERUN_TASKS:-false} == true ]]; then rebuild=(--rerun-tasks); fi
 bash ./gradlew :distributions-full:binDistributionZip --no-scan --no-daemon \
     --max-workers=2 --no-build-cache --console=plain --dependency-verification=strict \
     '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-    "-PversionQualifier=android-$port_revision" "-PbuildTimestamp=$timestamp" "${rebuild[@]}" \
+    -PfinalRelease=true "-PbuildTimestamp=$timestamp" "${rebuild[@]}" \
+    "-PandroidDistributionVersion=$distribution_version" \
     "-PandroidComponentsNotices=$work_dir/notices" 2>&1 | tee "$work_dir/build.log"
 python3 "$recipe_dir/verify.py" "$work_dir" "$version"
 printf 'Verified distribution and receipt: %s\n' "$work_dir/verification.json"

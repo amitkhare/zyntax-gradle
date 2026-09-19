@@ -8,13 +8,13 @@ from pathlib import Path
 import sys
 import zipfile
 
-from targets import load_target
+from targets import distribution_version, load_target
 
 def main():
     stage = Path(sys.argv[1]).resolve()
     target = load_target(sys.argv[2], require_recipe=True)
     timestamp = (stage / "build-timestamp").read_text().strip()
-    version = f"{target['version']}-android-{target['recipe']['portRevision']}-{timestamp}"
+    version = distribution_version(target, timestamp)
     archive = stage / "source" / target["distributionProjectPath"] / "build/distributions" / f"gradle-{version}-bin.zip"
     prefix = f"gradle-{version}/"
     records = json.loads((stage / "component-inputs.json").read_text())
@@ -48,8 +48,10 @@ def main():
                     text = jar.read(receipt).decode("utf-8").replace("\\:", ":")
                     properties = dict(line.split("=", 1) for line in text.splitlines()
                                       if "=" in line and not line.startswith("#"))
-                    if properties.get("versionNumber") != version:
+                    if properties.get("versionNumber") != target["runtimeVersion"]:
                         raise ValueError(f"Incorrect runtime identity in {name}: {properties}")
+                    if properties.get("baseVersion") != target["runtimeVersion"] or properties.get("isSnapshot") != "false":
+                        raise ValueError(f"Runtime is not the declared final downstream release: {name}")
                     if properties.get("commitId") != target["revision"]:
                         raise ValueError(f"Incorrect source revision in {name}: {properties}")
                     receipts.append(name)
@@ -58,7 +60,9 @@ def main():
     print(f"PASS qualified ZIP/runtime identity, exact three component JARs and notices: {archive}")
     with archive.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    report = {"version": version, "file": archive.name, "sha256": digest, "size": archive.stat().st_size}
+    report = {"version": target["runtimeVersion"], "upstreamVersion": target["version"],
+              "distributionVersion": version, "file": archive.name,
+              "sha256": digest, "size": archive.stat().st_size}
     (stage / "verification.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
 

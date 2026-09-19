@@ -1,0 +1,98 @@
+# Android client/daemon/worker/VFS qualification
+
+This headless, offline fixture generalizes the owned private two-build Gradle
+fixture. Preparing it or passing its host contract tests does **not** qualify a
+new Android distribution. It modifies neither the selected distribution nor an
+existing project. No app, SDK, extension, or device harness source is included.
+
+One project and one generated worker source cover the explicit target profiles
+in `distribution/targets.json`. Milestone 26 uses its genuine static `Native`
+API; milestones 28/29 use the instance API. Unknown layouts fail instead of
+trying another API. The manifest selects exact native-platform and file-events
+JAR names and Android resources. No installed component search is performed.
+
+## Inputs and invocation
+
+Use the existing private `DeviceBuildCheck` harness (its `scriptBase64` input)
+or another authorized app-routed Bash invocation. No harness changes are needed.
+Transfer this directory, the exact `targets.json`, the selected unpacked archive,
+and the two explicit fixture dependencies using the existing trusted transfer
+workflow. Keep them app-private. Do not modify the distribution or Gradle cache.
+
+Gradle 9 declares JUnit as a provided/compile-only framework, unlike the bundled
+Gradle 8 runtime dependency. Both versions therefore use the same explicit
+fixture inputs. Reuse the already-cached binaries; this fixture never downloads:
+
+| Input | Required SHA-256 |
+| --- | --- |
+| `junit-4.13.2.jar` | `8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3` |
+| `hamcrest-core-1.3.jar` | `66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9` |
+
+These hashes match the existing upstream dependency cache. Both files are
+ordinary project test dependencies, not injections into Gradle's runtime.
+Select app-private `PREFIX`, `JAVA_HOME`, and Bash/Python explicitly. Preserve
+the app executor's routing and preload environment. For example, with the
+following variables already set to exact selected inputs:
+
+```bash
+export PATH="$JAVA_HOME/bin:$PREFIX/bin"
+export TERM=xterm-256color TERMINFO="$PREFIX/share/terminfo"
+"$PREFIX/bin/bash" "$FIXTURE/run.bash" \
+  --targets "$TARGETS_JSON" --target "$SOURCE_TARGET" \
+  --distribution "$SELECTED_DISTRIBUTION" \
+  --expected-gradle-version "$EXPECTED_GRADLE_API_VERSION" \
+  --junit "$JUNIT_JAR" --hamcrest "$HAMCREST_JAR" \
+  --work-root "$ZYNTAX_PROJECTS"
+```
+
+`--target` is the exact source version, not a family or replacement version.
+`--expected-gradle-version` is the exact expected Gradle API/runtime identity;
+it is never inferred from the archive directory or required to contain an
+Android suffix. `--distribution` independently selects the archive folder.
+The actual launcher must use the expected runtime version's exact bootstrap
+JAR (`gradle-gradle-cli-main-<expected-version>.jar`) via `-jar`,
+with `Main-Class: org.gradle.launcher.GradleMain` and that class entry.
+The expected version is asserted by the running daemon, not merely recorded.
+For new source recipes, target `9.6.0` with port revision 1 therefore takes
+`--expected-gradle-version 9.6.0.1`; native component selection still uses the
+upstream target's profile. There is no fallback to a base-version bootstrap.
+The previously qualified 8.14.3 snapshot used a base-version bootstrap despite
+its snapshot runtime identity; retain its original private fixture/evidence.
+This fixture qualifies new coherent runtime/JAR identities, not that legacy layout.
+
+## Preserved assertions
+
+- Both builds use a real 80x24 PTY and explicit TERM/TERMINFO. The actual CLI PID
+  maps the selected JDK, native-platform and curses. This proves loading, not a
+  surrogate client service call or Jansi JNI execution. Android's explicit-linker
+  runtime remains intact; `/proc` access denial is a failure, not a skip.
+- The separate daemon reports native process/filesystem/watching capabilities,
+  its actual PID/cwd, changed per-client environment, and native-backed stat/chmod
+  on a real private 0600 file. The evaluated watch mode must be `DEFAULT`.
+- A normal separate JUnit worker loads the exact paired native-platform JAR's
+  Android resource, performs the genuine Java/JNI version check, and validates
+  PID/cwd/environment/stat/chmod. Gradle's worker bootstrap native-services
+  policy is not overridden. No reflective registry access or Java agent is used.
+- On confirmed F2FS, two builds reuse one daemon/watcher. Before second-build
+  input snapshotting, unchanged input retains its original hash and changed input
+  is invalidated. Changed output updates, unchanged task is up-to-date, and
+  upstream structured operation results require events, retained files, watched
+  hierarchies, and no start-time discard or watcher shutdown.
+
+Each invocation gets a fresh project and `GRADLE_USER_HOME`, isolating existing
+properties and daemon registries. No native/watch enable flag, repository, or
+production option is injected. Evidence and failed-build logs remain in the
+printed private work directory. PTY output is drained during bounded handshake
+and cleanup. The selected distribution's normal `--stop` uses that isolated
+Gradle home after success or failure; unrelated daemon registries are not stopped.
+
+Run the small host-only contract tests in Linux (Python needs POSIX `pty`/`fcntl`):
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 distribution/tests/android-native/test_fixture.py
+bash -n distribution/tests/android-native/run.bash
+```
+
+These tests check profile/template selection, exact input checksums, independent
+archive/runtime identity and preservation of the structured VFS failure gates.
+They do not build Gradle, execute JNI, contact a device, or establish qualification.

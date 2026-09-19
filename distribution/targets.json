@@ -80,7 +80,7 @@
       "dependencyFile": "packaging/distributions-dependencies/build.gradle.kts",
       "recipe": {
         "patches": ["source.patch"],
-        "portRevision": 1
+        "portRevision": 2
       }
     },
     "9.3.1": {
