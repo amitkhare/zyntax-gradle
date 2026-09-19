@@ -49,6 +49,16 @@ The fixture preserves upstream Gradle 9's NIO metadata/JDK permission services;
 it does not substitute old native-backed metadata behavior. This candidate is
 not yet published; matching AGP/native-build qualification remains separate.
 
+The normal distribution task subsequently regenerated its unpublished archive
+to include the native components' original source-provenance properties beside
+their notice. The preserved, Android-tested ZIP was not modified. Comparing both
+archives verified all 699 existing entries byte-for-byte with identical modes;
+the only addition is that provenance file. The corrected candidate is
+140,773,041 bytes, SHA-256
+`6f208ff6debd4b9a36fc8a6b3b2c814edcd1f9e80aa27ad7d1434721f2f8885a`.
+No runtime behavior changed or additional Android run was needed for this
+notice-only packaging correction.
+
 ### Runtime identity and archive identity
 
 New stable ports use a fourth numeric component, for example `9.6.0.1` means
@@ -72,6 +82,14 @@ Build dependency caches are shared across these serial source builds at
 `/work/gradle-native/gradle-home`; `BUILD_GRADLE_USER_HOME` can select another
 explicit build cache. Per-target source/output directories and timestamps remain
 separate. Already downloaded tools are reused, not downloaded per target.
+
+The manifest also declares the exact upstream source-build JDK: 8.11.1 uses 11,
+8.14.3, 9.3.1, 9.4.1 and 9.6.0 use 17, and 9.7.1 uses 25. The build validates
+both `java` and `javac` before staging components or invoking Gradle. Set
+`SOURCE_BUILD_JAVA_HOME` to an explicit complete JDK when `JAVA_HOME` or the
+builder's JDK 17 default does not match. The recipe does not bypass upstream's
+own Java-version check or silently select another installed JDK. Source-only
+`prepare` mode does not require the target JDK.
 
 Build the standalone `zyntax-gradle-native-builder` image from the repository-root
 Dockerfile (Bash entrypoint, host JDK 17) and use the independent

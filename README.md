@@ -73,8 +73,11 @@ caches. Gradle, AGP and NDK source/build ownership is separate.
 
 The builder extends a pinned existing Termux build-image digest and adds only
 missing CMake, Ninja and JDK 25 host tools. It also provides host JDKs 17 and 21.
-Gradle 9.7.1's **source-build daemon** requires JDK 25; this is not a requirement
-imposed on every Android project or its application bytecode.
+Each distribution target declares and validates its upstream source-build JDK:
+8.11.1 requires 11, 8.14.3 through 9.6.0 require 17, and 9.7.1 requires 25.
+`SOURCE_BUILD_JAVA_HOME` selects an explicit complete JDK when the image default
+does not match. These are build-tool requirements, not requirements imposed on
+every Android project or its application bytecode.
 Distribution builds accept `BUILD_WORKERS=1` for memory-constrained hosts and
 resume from their existing source stage and downloaded dependency cache.
 

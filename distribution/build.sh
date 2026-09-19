@@ -4,7 +4,7 @@ set -euo pipefail
 recipe_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 version=${GRADLE_VERSION:-8.14.3}
 recipe_fields=$(python3 "$recipe_dir/targets.py" "$version" --recipe)
-IFS=$'\t' read -r revision wrapper_version wrapper_sha256 port_revision runtime_version patch_names <<<"$recipe_fields"
+IFS=$'\t' read -r revision wrapper_version wrapper_sha256 port_revision runtime_version source_build_java patch_names <<<"$recipe_fields"
 work_dir=${WORK_DIR:-/work/gradle-native/distribution/$version-android.$port_revision}
 source_input=${SOURCE_INPUT:-/work/gradle-native/gradle}
 mode=${1:-build}
@@ -12,8 +12,12 @@ mode=${1:-build}
 build_workers=${BUILD_WORKERS:-2}
 [[ $build_workers =~ ^[1-9][0-9]*$ ]] || { printf 'BUILD_WORKERS must be positive.\n' >&2; exit 1; }
 [[ $work_dir == /work/gradle-native/distribution/* && $work_dir != */../* ]]
-export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}
-export PATH="$JAVA_HOME/bin:$PATH"
+if [[ $mode == build ]]; then
+    source_build_java_home=${SOURCE_BUILD_JAVA_HOME:-${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}}
+    export JAVA_HOME
+    JAVA_HOME=$(python3 "$recipe_dir/source_java.py" "$source_build_java_home" "$source_build_java")
+    export PATH="$JAVA_HOME/bin:$PATH"
+fi
 export GRADLE_USER_HOME=${BUILD_GRADLE_USER_HOME:-/work/gradle-native/gradle-home}
 mkdir -p "$work_dir"
 exec 9>"$work_dir/build.lock"

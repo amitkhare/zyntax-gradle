@@ -27,6 +27,10 @@ def load_target(version, require_recipe=False):
         recipe = target["recipe"]
         if target["distributionProjectPath"] not in ("subprojects/distributions-full", "packaging/distributions-full"):
             raise ValueError("Unknown source distribution project")
+        if type(target.get("sourceBuildJava")) is not int or target["sourceBuildJava"] < 1:
+            raise ValueError("Invalid source-build Java version")
+        if target.get("sourceBuildJavaPolicy") not in ("daemon-jvm-criteria", "settings-version-check"):
+            raise ValueError("Unknown source-build Java policy")
         if not isinstance(recipe["portRevision"], int) or recipe["portRevision"] < 1:
             raise ValueError("Invalid port revision")
         # A downstream release is distinct from both stock Gradle and other
@@ -111,10 +115,19 @@ def audit_source(repository, target):
     expected_versions["fileEvents"] = profile["fileEvents"]["version"]
     if actual != expected_versions:
         raise ValueError(f"Native dependency versions differ: {actual} != {expected_versions}")
-    if "sourceBuildDaemonJava" in target:
+    if target["sourceBuildJavaPolicy"] == "daemon-jvm-criteria":
         daemon = source("gradle/gradle-daemon-jvm.properties")
-        if f"toolchainVersion={target['sourceBuildDaemonJava']}" not in daemon.splitlines():
+        versions = [line.removeprefix("toolchainVersion=") for line in daemon.splitlines()
+                    if line.startswith("toolchainVersion=")]
+        if versions != [str(target["sourceBuildJava"])]:
             raise ValueError("Source build daemon JDK differs from pinned criteria")
+    else:
+        settings = source("settings.gradle.kts")
+        version = target["sourceBuildJava"]
+        condition = f"if (!JavaVersion.current().isJava{version}) {{"
+        message = f'This build requires JDK {version}.'
+        if settings.count(condition) != 1 or settings.count(message) != 1:
+            raise ValueError("Source build JDK check differs from pinned criteria")
 
 
 def main():
@@ -139,6 +152,7 @@ def main():
         if args.recipe:
             print(target["revision"], target["wrapperVersion"], target["wrapperSha256"],
                   target["recipe"]["portRevision"], target["runtimeVersion"],
+                  target["sourceBuildJava"],
                   " ".join(target["recipe"]["patches"]), sep="\t")
         else:
             print(f"{version}: {'source audited' if args.source else 'source pinned'}; "
