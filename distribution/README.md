@@ -16,9 +16,10 @@ remains the default. Gradle 9 targets use one shared file-watching patch plus a
 small version-specific dependency/packaging patch. Upstream changes such as
 9.7's probe-file cleanup are retained. The 8.11.1 recipe uses milestone 26's
 original file-events module/API and retains its original watch-logging contract.
-Its corrected native component passed source and Android JNI checks; complete
-8.11.1 distribution qualification remains pending. The 9.6.0.1 candidate's
-focused qualification is recorded below. No version is substituted.
+Its corrected native component and complete 8.11.1.1 distribution passed the
+focused Android checks below, as did the 9.3.1.1, 9.4.1.1, 9.6.0.1 and 9.7.1.1 candidates. These
+new versions are not published yet; matching AGP/APK qualification remains
+pending. No version is substituted.
 
 The recipe reads source/bootstrap pins and component versions from the manifest.
 It combines only the declared patch series, validates the cached commit rather
@@ -31,8 +32,66 @@ upstream license generation and ZIP/receipt/component verification in 10m19s
 (978 tasks). Its candidate SHA-256 is
 `6fae884f92e9be48fc696a94ee308bad6fac0c88824455a2c31da2a107b0bfc4`
 (151,523,711 bytes); it is not published. Android runtime checks and release
-identity qualification remain pending. That initial candidate used a prerelease
-runtime qualifier and is retained as source-build evidence, not a final release.
+identity qualification were pending for that initial candidate. It used a
+prerelease runtime qualifier and remains historical source-build evidence, not
+a final release. The stable 9.7.1.1 candidate is qualified separately below.
+
+### Additional qualified candidate: Gradle 8.11.1.1
+
+The source build completed 837 tasks in 20m06s using its required cached JDK 11
+and recipe commit `15d368f`. Its exact archive is
+`gradle-8.11.1-android-1-20260919193417+0000-bin.zip`, 136,143,461 bytes, SHA-256
+`0adb8575da81ffb372aec8980e0df91aa4e4d27a31691cdbb4ca1fb5faf2e4e6`.
+Archive/component/provenance checks passed before device use.
+
+On 2026-09-20 this unchanged archive passed the complete Android
+client/daemon/worker/F2FS fixture in 67.309 seconds using Dev's already-installed
+JDK 21. Both builds reused daemon PID 21318; two workers passed genuine JNI,
+default-mode watching retained unchanged snapshots and invalidated changed
+inputs, and the isolated daemon stopped normally. Cached test dependencies were
+reused; no package installation, UI navigation, Full-app/project modification,
+app/core/extension-SDK or bootstrap change occurred.
+
+Private evidence: `gradle-native-integration-ta7xftvs/evidence/result.json` under
+the Dev projects directory; harness `run-4182510064522401491/output.log`.
+Matching AGP/APK qualification and publication remain pending. These checks
+establish the exercised native services, not arbitrary project compatibility.
+
+### Additional qualified candidate: Gradle 9.3.1.1
+
+The source build completed 868 tasks in 19m37s using the required JDK 17 and
+recipe commit `15d368f`. Its verified archive is
+`gradle-9.3.1-android-1-20260919193458+0000-bin.zip`, 137,098,066 bytes, SHA-256
+`df3b27b72f5411eb32f5141394ac812a7268ba0b2a87efde19fcb627996a062f`.
+
+On 2026-09-20 this unchanged archive passed the complete Android
+client/daemon/worker/F2FS fixture in 66.905 seconds using Dev's existing JDK 21.
+Both builds reused daemon PID 24208; two workers passed genuine JNI and default
+watching retained unchanged snapshots and invalidated changed inputs. All fixture
+dependencies were reused from cache; no additional package installation or app
+change was needed. Private evidence: `gradle-native-integration-c7tb79kj/evidence`
+under Dev's projects directory; harness `run-7812940193724266485/output.log`.
+Matching AGP/APK qualification and publication remain pending.
+
+### Additional qualified candidate: Gradle 9.4.1.1
+
+The original 6-GiB source-build container reached its aggregate memory limit;
+the preserved attempt has a Docker OOM event, not a source or JVM-heap failure.
+One normal resume at 7 GiB with the same source, JVM options and one worker
+completed in 6m14s (692 tasks, including 336 up-to-date). No recipe, source
+policy or compiled input was changed to accommodate the host resource limit.
+Recipe commit `15d368f` produced
+`gradle-9.4.1-android-1-20260919193529+0000-bin.zip`, 137,966,641 bytes, SHA-256
+`bf1dad169d6e5931053c9ee9836da7a13898c94a543bbd5e8bf1b869081bf062`.
+
+On 2026-09-20 the unchanged verified archive passed the complete Android
+client/daemon/worker/F2FS fixture in 64.996 seconds with existing Dev JDK 21.
+Both builds reused daemon PID 26362, both workers passed JNI, and default
+watching retained unchanged snapshots and invalidated changed inputs.
+Private evidence: `gradle-native-integration-plbm9ohd/evidence` under Dev's
+projects directory; harness `run-864678833077280987/output.log`. No extra
+packages, UI navigation, Full-app/project, app/core/SDK or bootstrap change.
+Matching AGP/APK qualification and publication remain pending.
 
 ### Additional qualified candidate: Gradle 9.6.0.1
 
@@ -58,6 +117,24 @@ the only addition is that provenance file. The corrected candidate is
 `6f208ff6debd4b9a36fc8a6b3b2c814edcd1f9e80aa27ad7d1434721f2f8885a`.
 No runtime behavior changed or additional Android run was needed for this
 notice-only packaging correction.
+
+### Additional qualified candidate: Gradle 9.7.1.1
+
+The exact source build passed in 9m32s (978 executed tasks), using required
+cached JDK 25, one worker and a 7-GiB container. Recipe commit `15d368f` produced
+`gradle-9.7.1-android-1-20260919193557+0000-bin.zip`, 151,526,232 bytes, SHA-256
+`c6f309b1e21ca91a7620477b0c80dd80bbbadaa2ffab77aa6e00fd767324aa9b`.
+Archive, runtime receipt, component and notice verification passed.
+
+On 2026-09-20 the unchanged archive passed the complete Android
+client/daemon/worker/F2FS fixture in 66.829 seconds using existing Dev JDK 21.
+Both builds reused daemon PID 28307; both workers passed JNI and default
+watching retained unchanged snapshots and invalidated changed inputs. Its
+source-build JDK 25 requirement is not an Android runtime requirement.
+Private evidence: `gradle-native-integration-83vnwfkw/evidence` under Dev's
+projects directory; harness `run-3848025695997105904/output.log`.
+No additional packages, UI navigation, Full-app/project, core/SDK or bootstrap
+change. Matching AGP/APK qualification and publication remain pending.
 
 ### Runtime identity and archive identity
 
