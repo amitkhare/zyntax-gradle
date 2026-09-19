@@ -9,6 +9,8 @@ work_dir=${WORK_DIR:-/work/gradle-native/distribution/$version-android.$port_rev
 source_input=${SOURCE_INPUT:-/work/gradle-native/gradle}
 mode=${1:-build}
 [[ $mode == prepare || $mode == build ]]
+build_workers=${BUILD_WORKERS:-2}
+[[ $build_workers =~ ^[1-9][0-9]*$ ]] || { printf 'BUILD_WORKERS must be positive.\n' >&2; exit 1; }
 [[ $work_dir == /work/gradle-native/distribution/* && $work_dir != */../* ]]
 export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}
 export PATH="$JAVA_HOME/bin:$PATH"
@@ -60,7 +62,7 @@ printf 'Prepared isolated source: %s\n' "$source_dir"
 
 : "${NATIVE_ARTIFACTS:?Supply the verified native-platform/file-events artifacts directory}"
 : "${JANSI_ARTIFACTS:?Supply the verified Jansi artifacts directory}"
-python3 "$recipe_dir/stage.py" "$work_dir" "$NATIVE_ARTIFACTS" "$JANSI_ARTIFACTS" "$version"
+python3 "$recipe_dir/stage.py" "$work_dir" "$NATIVE_ARTIFACTS" "$JANSI_ARTIFACTS" "$version" "$build_workers"
 export ZYNTAX_GRADLE_COMPONENTS_REPOSITORY="$work_dir/maven"
 cd "$source_dir"
 rebuild=()
@@ -68,7 +70,7 @@ if [[ ${RERUN_TASKS:-false} == true ]]; then rebuild=(--rerun-tasks); fi
 # Exact upstream task and configuration-cache mode (required by newer Isolated
 # Projects builds). No release/install/cache rewriting or test-suite expansion.
 bash ./gradlew :distributions-full:binDistributionZip --no-scan --no-daemon \
-    --max-workers=2 --no-build-cache --console=plain --dependency-verification=strict \
+    --max-workers="$build_workers" --no-build-cache --console=plain --dependency-verification=strict \
     '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
     -PfinalRelease=true "-PbuildTimestamp=$timestamp" "${rebuild[@]}" \
     "-PandroidDistributionVersion=$distribution_version" \

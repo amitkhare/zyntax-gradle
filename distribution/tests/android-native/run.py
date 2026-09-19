@@ -35,6 +35,7 @@ NATIVE_APIS = {
     "integrated": {"NATIVE_INITIALIZE": "Native.init(extract);", "NATIVE_ACCESS": "Native"},
     "standalone": {"NATIVE_INITIALIZE": "Native nativeApi = Native.init(extract);", "NATIVE_ACCESS": "nativeApi"},
 }
+LAUNCHER_MAIN_CLASS = "org.gradle.launcher.GradleMain"
 
 
 def load_profile(manifest_path, version):
@@ -43,6 +44,9 @@ def load_profile(manifest_path, version):
     require(version in manifest["targets"], f"Unknown exact target: {version}")
     target = manifest["targets"][version]
     profile = manifest["componentProfiles"][target["components"]]
+    launcher_mode = target.get("launcherMode")
+    require(launcher_mode in ("classpath", "jar"),
+            f"Unsupported explicit launcher mode for target {version}: {launcher_mode}")
     layout = profile["nativeBuild"]["fileEventsLayout"]
     require(layout in NATIVE_APIS, f"Unsupported explicit native API layout: {layout}")
     for name in (version, profile["nativePlatform"], profile["fileEvents"]["version"]):
@@ -51,6 +55,7 @@ def load_profile(manifest_path, version):
     require(profile["fileEvents"]["artifact"] == expected_artifact, "File-events artifact/layout mismatch")
     return {
         "target": version, "sourceRevision": target["revision"], "componentProfile": target["components"],
+        "launcherMode": launcher_mode, "launcherMainClass": LAUNCHER_MAIN_CLASS,
         "nativeLayout": layout,
         "nativePlatformName": f"native-platform-{profile['nativePlatform']}-zyntax.1.jar",
         "fileEventsName": f"{expected_artifact}-{profile['fileEvents']['version']}-zyntax.1.jar",
@@ -59,6 +64,81 @@ def load_profile(manifest_path, version):
             "standalone": "net/rubygrapefruit/platform/aarch64-linux-android/libgradle-fileevents.so",
         }[layout],
     }
+
+
+def jar_manifest(archive):
+    lines = archive.read("META-INF/MANIFEST.MF").decode("utf-8").replace("\r\n", "\n").split("\n")
+    logical = []
+    for line in lines:
+        if not line:
+            break
+        if line.startswith(" "):
+            require(logical, "Invalid launcher manifest continuation")
+            logical[-1] += line[1:]
+        else:
+            logical.append(line)
+    attributes = {}
+    for line in logical:
+        name, separator, value = line.partition(": ")
+        require(separator and name not in attributes, "Invalid launcher manifest attribute")
+        attributes[name] = value
+    return attributes
+
+
+def launcher_identity(bootstrap, expected_version):
+    bootstrap = bootstrap.resolve(strict=True)
+    with zipfile.ZipFile(bootstrap) as archive:
+        manifest = jar_manifest(archive)
+        require(manifest.get("Main-Class") == LAUNCHER_MAIN_CLASS,
+                "Selected bootstrap manifest does not declare GradleMain")
+        archive.getinfo("org/gradle/launcher/GradleMain.class")
+    classpath = [bootstrap]
+    for entry in manifest.get("Class-Path", "").split():
+        require(Path(entry).name == entry and not Path(entry).is_absolute(),
+                "Launcher manifest classpath must contain adjacent JAR names")
+        dependency = (bootstrap.parent / entry).resolve(strict=True)
+        require(dependency.parent == bootstrap.parent and dependency.is_file(),
+                "Launcher manifest classpath escapes the selected distribution")
+        classpath.append(dependency)
+    receipts = []
+    for dependency in classpath:
+        with zipfile.ZipFile(dependency) as archive:
+            try:
+                receipt = archive.read("org/gradle/build-receipt.properties").decode("iso-8859-1")
+            except KeyError:
+                continue
+        versions = [line.partition("=")[2] for line in receipt.splitlines()
+                    if line.startswith("versionNumber=")]
+        require(len(versions) == 1, f"Invalid build receipt in launcher classpath: {dependency}")
+        receipts.append((dependency, versions[0]))
+    require(len(receipts) == 1, "Launcher classpath must expose exactly one Gradle build receipt")
+    receipt_jar, receipt_version = receipts[0]
+    require(receipt_version == expected_version,
+            f"Launcher build receipt version mismatch: expected {expected_version}, found {receipt_version}")
+    return {"launcherClasspath": [str(path) for path in classpath],
+            "receiptJar": str(receipt_jar), "receiptVersion": receipt_version}
+
+
+def inspect_client_launch(cmdline, configuration):
+    bootstrap = Path(configuration["bootstrap"])
+    mode = configuration["launcherMode"]
+    main_class = configuration["launcherMainClass"]
+    if mode == "classpath":
+        require(cmdline.count("-classpath") == 1 and "-jar" not in cmdline,
+                "Expected the generated launcher's single classpath entry point")
+        index = cmdline.index("-classpath")
+        require(len(cmdline) > index + 2 and cmdline[index + 2] == main_class,
+                "Generated launcher did not invoke GradleMain after its classpath")
+        paths = [Path(path).resolve(strict=True) for path in cmdline[index + 1].split(os.pathsep)]
+        require(paths == [bootstrap], "Actual client uses another bootstrap classpath")
+    elif mode == "jar":
+        require(cmdline.count("-jar") == 1, "Expected the generated launcher's single -jar argument")
+        index = cmdline.index("-jar")
+        require(len(cmdline) > index + 1 and Path(cmdline[index + 1]).resolve(strict=True) == bootstrap,
+                "Actual client uses another bootstrap JAR")
+    else:
+        raise AssertionError(f"Unsupported configured launcher mode: {mode}")
+    return bootstrap
 
 
 def checked_test_input(name, path):
@@ -80,6 +160,7 @@ def configuration_for(args):
         path = distribution / "lib" / configuration[key + "Name"]
         require(path.is_file(), f"Missing selected-distribution input: {path}")
         configuration[key] = str(path.resolve(strict=True))
+    configuration.update(launcher_identity(Path(configuration["bootstrap"]), args.expected_gradle_version))
     for key, resource in (
         ("nativePlatform", "net/rubygrapefruit/platform/android-aarch64/libnative-platform.so"),
         ("fileEvents", configuration["fileEventsResource"]),
@@ -183,15 +264,7 @@ def build_once(distribution, configuration, work, phase):
             # Inspect the actual launcher PID. The runtime may physically execute linker64.
             cmdline = Path(f"/proc/{client.pid}/cmdline").read_bytes().decode().split("\0")
             try:
-                require(cmdline.count("-jar") == 1, "Expected the generated launcher's single -jar argument")
-                bootstrap = Path(cmdline[cmdline.index("-jar") + 1]).resolve(strict=True)
-                require(bootstrap == Path(configuration["bootstrap"]),
-                    "Actual client uses another bootstrap JAR")
-                with zipfile.ZipFile(bootstrap) as archive:
-                    manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8").splitlines()
-                    require(manifest.count("Main-Class: org.gradle.launcher.GradleMain") == 1,
-                        "Selected bootstrap manifest does not declare GradleMain")
-                    archive.getinfo("org/gradle/launcher/GradleMain.class")
+                bootstrap = inspect_client_launch(cmdline, configuration)
             except Exception:
                 print("CLIENT_ARGV=" + json.dumps(cmdline)[:2000], flush=True)
                 raise
@@ -207,7 +280,9 @@ def build_once(distribution, configuration, work, phase):
             daemon = json.loads((evidence / f"daemon-{phase}.json").read_text())
             require(daemon["pid"] != client.pid, "Expected a separate daemon JVM")
             (evidence / f"client-{phase}.json").write_text(json.dumps({"pid": client.pid,
-                "launchMode": "jar", "mainClass": "org.gradle.launcher.GradleMain", "bootstrap": str(bootstrap),
+                "launchMode": configuration["launcherMode"], "mainClass": configuration["launcherMainClass"],
+                "bootstrap": str(bootstrap), "receiptJar": configuration["receiptJar"],
+                "receiptVersion": configuration["receiptVersion"],
                 "jvm": str(jvm_paths[0]), "pty": "80x24", "term": environment["TERM"], "mappings": mappings}))
         finally:
             # Always unblock the task, including when Android denies /proc access.

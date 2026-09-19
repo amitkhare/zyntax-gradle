@@ -95,8 +95,9 @@ guard checks; these do not run Gradle or native/device tests.
 Upstream's build wrapper is Gradle 8.14.2. Its binary ZIP SHA-256 is pinned to
 `7197a12f450794931532469d4ff21a59ea2c1cd59a3ec3f89c035c3c420a6999`, verified from
 the [official checksum](https://services.gradle.org/distributions/gradle-8.14.2-bin.zip.sha256).
-The source wrapper receives that checksum before execution. Build limits are two
-workers and a 2 GB Gradle heap; build scans and build cache are disabled.
+The source wrapper receives that checksum before execution. Build limits default
+to two workers and a 2 GB Gradle heap; use `BUILD_WORKERS=1` on memory-constrained
+hosts. Build scans and build cache are disabled.
 Configuration cache follows the exact upstream build's settings, including the
 Isolated Projects requirement in 9.7. Resumes reuse locally compiled task outputs and the
 shared downloaded dependencies. `RERUN_TASKS=true` requests a full local task rebuild when needed.

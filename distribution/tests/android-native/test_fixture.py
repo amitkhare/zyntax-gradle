@@ -16,6 +16,26 @@ import run
 MANIFEST = Path(__file__).resolve().parents[2] / "targets.json"
 
 
+def write_launcher(library, runtime_version, receipt_version=None):
+    receipt_name = f"gradle-base-services-{runtime_version}.jar"
+    receipt = library / receipt_name
+    with zipfile.ZipFile(receipt, "w") as archive:
+        archive.writestr("org/gradle/build-receipt.properties",
+                         f"versionNumber={receipt_version or runtime_version}\n")
+    bootstrap = library / f"gradle-gradle-cli-main-{runtime_version}.jar"
+    with zipfile.ZipFile(bootstrap, "w") as archive:
+        archive.writestr("META-INF/MANIFEST.MF", "\r\n".join((
+            "Manifest-Version: 1.0",
+            "Main-Class: org.gradle.launcher.GradleMain",
+            "Class-Path: gradle-base-",
+            f" services-{runtime_version}.jar",
+            "",
+            "",
+        )))
+        archive.writestr("org/gradle/launcher/GradleMain.class", b"test-only class placeholder")
+    return bootstrap, receipt
+
+
 class ProfileTest(unittest.TestCase):
     def test_every_target_has_one_explicit_source_api(self):
         manifest = json.loads(MANIFEST.read_text())
@@ -23,6 +43,8 @@ class ProfileTest(unittest.TestCase):
             with self.subTest(version=version):
                 profile = run.load_profile(MANIFEST, version)
                 self.assertEqual(target["components"], profile["componentProfile"])
+                self.assertEqual(target["launcherMode"], profile["launcherMode"])
+                self.assertEqual("org.gradle.launcher.GradleMain", profile["launcherMainClass"])
                 self.assertNotIn("bootstrapName", profile)
                 source = run.worker_source(profile["nativeLayout"])
                 self.assertNotIn("${", source)
@@ -47,6 +69,18 @@ class ProfileTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "Unsupported explicit native API"):
             run.load_profile(Mock(read_text=lambda: json.dumps(manifest)), "8.11.1")
 
+    def test_missing_or_unknown_launcher_mode_fails_closed(self):
+        manifest = json.loads(MANIFEST.read_text())
+        for launcher_mode in (None, "unknown"):
+            modified = copy.deepcopy(manifest)
+            if launcher_mode is None:
+                modified["targets"]["9.7.1"].pop("launcherMode")
+            else:
+                modified["targets"]["9.7.1"]["launcherMode"] = launcher_mode
+            with self.subTest(launcher_mode=launcher_mode), self.assertRaisesRegex(
+                    AssertionError, "Unsupported explicit launcher mode"):
+                run.load_profile(Mock(read_text=lambda: json.dumps(modified)), "9.7.1")
+
     def test_artifact_layout_mismatch_fails(self):
         manifest = json.loads(MANIFEST.read_text())
         manifest["componentProfiles"]["8.11"]["fileEvents"]["artifact"] = "gradle-fileevents"
@@ -63,8 +97,7 @@ class ProfileTest(unittest.TestCase):
                     library = distribution / "lib"
                     library.mkdir(parents=True)
                     profile = run.load_profile(MANIFEST, version)
-                    bootstrap = library / f"gradle-gradle-cli-main-{runtime_version}.jar"
-                    bootstrap.touch()
+                    bootstrap, receipt = write_launcher(library, runtime_version)
                     for key, resource in (
                         ("nativePlatform", "net/rubygrapefruit/platform/android-aarch64/libnative-platform.so"),
                         ("fileEvents", profile["fileEventsResource"]),
@@ -78,6 +111,17 @@ class ProfileTest(unittest.TestCase):
                     self.assertEqual(str(distribution.resolve()), configuration["distribution"])
                     self.assertEqual(runtime_version, configuration["expectedGradleVersion"])
                     self.assertEqual(str(bootstrap.resolve()), configuration["bootstrap"])
+                    self.assertEqual(str(receipt.resolve()), configuration["receiptJar"])
+                    self.assertEqual(runtime_version, configuration["receiptVersion"])
+                    if profile["launcherMode"] == "classpath":
+                        cmdline = ["java", "-classpath", str(bootstrap), run.LAUNCHER_MAIN_CLASS, "probe"]
+                        wrong_cmdline = ["java", "-jar", str(bootstrap), "probe"]
+                    else:
+                        cmdline = ["java", "-classpath", "\"\"", "-jar", str(bootstrap), "probe"]
+                        wrong_cmdline = ["java", "-classpath", str(bootstrap), run.LAUNCHER_MAIN_CLASS, "probe"]
+                    self.assertEqual(bootstrap.resolve(), run.inspect_client_launch(cmdline, configuration))
+                    with self.assertRaises(AssertionError):
+                        run.inspect_client_launch(wrong_cmdline, configuration)
                     # An upstream-base or old snapshot bootstrap is not a fallback.
                     stock_bootstrap = library / f"gradle-gradle-cli-main-{version}.jar"
                     bootstrap.rename(stock_bootstrap)
@@ -87,6 +131,13 @@ class ProfileTest(unittest.TestCase):
                     (library / profile["fileEventsName"]).unlink()
                     with self.assertRaisesRegex(AssertionError, "Missing selected-distribution input"):
                         run.configuration_for(args)
+
+    def test_launcher_receipt_must_match_expected_runtime(self):
+        with tempfile.TemporaryDirectory(prefix="gradle-fixture-launcher-") as temporary:
+            library = Path(temporary)
+            bootstrap, _ = write_launcher(library, "9.6.0.1", receipt_version="9.6.0")
+            with self.assertRaisesRegex(AssertionError, "build receipt version mismatch"):
+                run.launcher_identity(bootstrap, "9.6.0.1")
 
     def test_test_dependencies_require_exact_name_and_hash(self):
         with tempfile.TemporaryDirectory(prefix="gradle-fixture-input-") as temporary:

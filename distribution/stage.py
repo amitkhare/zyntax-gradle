@@ -120,6 +120,9 @@ def pom(name, version, dependencies):
 def main():
     stage, native, jansi = map(lambda value: Path(value).resolve(), sys.argv[1:4])
     target = load_target(sys.argv[4], require_recipe=True)
+    workers = sys.argv[5]
+    if not re.fullmatch(r"[1-9][0-9]*", workers):
+        raise ValueError("Build worker count must be a positive integer")
     profile = target["componentProfile"]
     NP = profile["nativePlatform"] + "-zyntax.1"
     FE = profile["fileEvents"]["version"] + "-zyntax.1"
@@ -250,7 +253,8 @@ def main():
         f"buildTimestamp={(stage / 'build-timestamp').read_text().strip()}\n"
         f"wrapperVersion={target['wrapperVersion']}\n"
         f"wrapperSha256={target['wrapperSha256']}\n"
-        "dependencyVerification=strict\nconfigurationCache=upstream\nbuildCache=false\nworkers=2\ngradleHeapMiB=2048\n"
+        "dependencyVerification=strict\nconfigurationCache=upstream\nbuildCache=false\n"
+        f"workers={workers}\ngradleHeapMiB=2048\n"
         "componentRepositoryInput=ZYNTAX_GRADLE_COMPONENTS_REPOSITORY\n"
     ).encode())
     print(json.dumps(records, indent=2))

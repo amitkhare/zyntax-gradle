@@ -56,6 +56,8 @@ The builder extends a pinned existing Termux build-image digest and adds only
 missing CMake, Ninja and JDK 25 host tools. It also provides host JDKs 17 and 21.
 Gradle 9.7.1's **source-build daemon** requires JDK 25; this is not a requirement
 imposed on every Android project or its application bytecode.
+Distribution builds accept `BUILD_WORKERS=1` for memory-constrained hosts and
+resume from their existing source stage and downloaded dependency cache.
 
 ## Native components: inputs and build
 
