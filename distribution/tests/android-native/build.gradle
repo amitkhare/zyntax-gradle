@@ -6,7 +6,6 @@ import org.gradle.internal.file.FileType
 import org.gradle.internal.nativeintegration.NativeCapabilities
 import org.gradle.internal.nativeintegration.ProcessEnvironment
 import org.gradle.internal.nativeintegration.processenvironment.NativePlatformBackedProcessEnvironment
-import org.gradle.internal.nativeintegration.filesystem.services.NativePlatformBackedFileMetadataAccessor
 import org.gradle.internal.nativeintegration.services.NativeServices
 import org.gradle.internal.watch.vfs.BuildLifecycleAwareVirtualFileSystem
 import org.gradle.internal.watch.registry.WatchMode
@@ -89,7 +88,8 @@ tasks.register('probe') {
         assert vfs.isWatchingAnyLocations()
         def filesystem = registry.get(FileSystem)
         def metadata = registry.get(FileMetadataAccessor)
-        assert metadata instanceof NativePlatformBackedFileMetadataAccessor
+        // Preserve upstream service selection: Gradle 9 uses NIO metadata and
+        // JDK permission services even when native process/watching is enabled.
         def scratch = layout.buildDirectory.file('native-mode.txt').get().asFile
         scratch.text = 'native-mode\n'
         filesystem.chmod(scratch, 0600)
@@ -100,7 +100,9 @@ tasks.register('probe') {
         def stable = vfs.findSnapshot(file('stable.txt').absolutePath)
         assert stable.present
         def result = [pid: daemonPid, phase: phase, nativeServices: true,
-            fileWatching: true, environment: true, nativeMode: '0600',
+            fileWatching: true, environment: true, fileMode: '0600',
+            processEnvironment: process.class.name, metadataAccessor: metadata.class.name,
+            fileSystem: filesystem.class.name,
             stableHash: stable.get().hash.toString()]
         new File(evidence, "daemon-${phase}.json").text = JsonOutput.toJson(result)
         new File(evidence, "ready-${phase}").createNewFile()

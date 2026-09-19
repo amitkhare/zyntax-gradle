@@ -10,7 +10,10 @@ claim that the corresponding full Gradle distribution has been qualified.
 Changes: scope sysctl to Apple where upstream has not already done so, and
 GNU strerror_r to glibc; build the
 native-platform Java companion for Android aarch64; map the shared Android
-platform identity to Android-named native resources in file-events. Generate
+platform identity to Android-named native resources in file-events.
+For milestone 26's integrated file-events, replace the desktop-only GNU libc
+probe with explicit Android target selection and Bionic compilation enforcement;
+keep the original inotify implementation and watcher lifecycle unchanged. Generate
 authentic matching Java/native version values. Cross-compile native sources
 with Android NDK r29 for arm64-v8a/API 24 and static libc++.
 Build the original curses component against the checksum-pinned official

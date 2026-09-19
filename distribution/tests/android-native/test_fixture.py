@@ -154,6 +154,23 @@ class ProfileTest(unittest.TestCase):
 
 
 class WatchingAssertionsTest(unittest.TestCase):
+    def test_daemon_preserves_upstream_metadata_selection_and_native_process_proof(self):
+        build = Path(__file__).with_name("build.gradle").read_text()
+        self.assertNotIn("NativePlatformBackedFileMetadataAccessor", build)
+        self.assertNotIn("metadata instanceof", build)
+        for required in (
+                "process instanceof NativePlatformBackedProcessEnvironment",
+                "process.pid", "process.processDir.canonicalFile",
+                "capabilities.useNativeIntegrations()", "capabilities.useFileSystemWatching()",
+                "def metadata = registry.get(FileMetadataAccessor)",
+                "def info = metadata.stat(scratch)", "info.type == FileType.RegularFile",
+                "info.length == scratch.length()", "filesystem.chmod(scratch, 0600)",
+                "(filesystem.getUnixMode(scratch) & 0777) == 0600",
+                "processEnvironment: process.class.name", "metadataAccessor: metadata.class.name",
+                "fileSystem: filesystem.class.name", "fileMode: '0600'"):
+            with self.subTest(assertion=required):
+                self.assertIn(required, build)
+
     def test_second_build_still_requires_retention_events_and_reuse(self):
         stats = {"numberOfWatchedHierarchies": 1, "retainedRegularFiles": 1, "numberOfReceivedEvents": 1}
         started = {"watchingEnabled": True, "startedWatching": False, "statistics": stats}

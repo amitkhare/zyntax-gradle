@@ -71,9 +71,13 @@ future 8.14 port revision, not that immutable legacy artifact.
   maps the selected JDK, native-platform and curses. This proves loading, not a
   surrogate client service call or Jansi JNI execution. Android's explicit-linker
   runtime remains intact; `/proc` access denial is a failure, not a skip.
-- The separate daemon reports native process/filesystem/watching capabilities,
-  its actual PID/cwd, changed per-client environment, and native-backed stat/chmod
-  on a real private 0600 file. The evaluated watch mode must be `DEFAULT`.
+- The separate daemon requires the native-platform process service, its actual
+  native PID/cwd, changed per-client environment, and native/watching capabilities.
+  Stat/size/chmod checks use upstream's selected filesystem services on a real
+  private 0600 file. Gradle 9 deliberately selects NIO metadata and JDK permissions;
+  Gradle 8 uses native-platform where available. The actual process, metadata and
+  filesystem implementation classes are recorded, without forcing a replacement.
+  The evaluated watch mode must be `DEFAULT`.
 - A normal separate JUnit worker loads the exact paired native-platform JAR's
   Android resource, performs the genuine Java/JNI version check, and validates
   PID/cwd/environment/stat/chmod. Gradle's worker bootstrap native-services

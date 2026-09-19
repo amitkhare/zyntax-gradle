@@ -39,8 +39,27 @@ Profile 8.11 preserves milestone 26's integrated file-events component, its
 original package/API and its separate generated native fingerprint. Source
 layout and probe API differences are selected at build time, never by runtime
 fallback. Both new profiles passed Java/JNI source compilation, generated
-fingerprint checks and host ELF checks; Android runtime qualification is pending.
+fingerprint checks and host ELF checks. The first milestone-26 Android probe
+exposed its integrated watcher's desktop-only glibc gate. Its corrected Android
+source port was rebuilt offline and passed the focused Android probe below.
 No unsupported profile silently uses another one.
+
+On 2026-09-20, profile 9's native-platform milestone 29 and file-events 0.2.8
+passed an Android Dev probe in a fresh JVM: their actual JNI methods reported
+219 filesystem records, used an 80x24 PTY, and delivered inotify events with
+orderly watcher shutdown. Jansi 2.4.2 also loaded its bundled Android library
+from an isolated extraction directory. Private harness evidence:
+`run-8232258351624930627/output.log`. This qualifies the exercised components,
+not a complete Gradle distribution.
+
+The corrected milestone-26 component passed the same real Android JNI, curses,
+80x24 PTY and inotify create/remove/shutdown checks on 2026-09-20. Upstream's
+generator produced file-events fingerprint
+`e3f8617e687641b53bbff97e1eed42ea635001df3f164ce77d5000618e57f36f`;
+the native-platform fingerprint is unchanged. Paired probe archive SHA-256:
+`35b5e0b59d28c2ff18910e0472e76eb5d394c8c9042c5e876898f346731841b6`.
+Private harness evidence: `run-3147119755237789211/output.log`. This does not yet
+qualify the complete Gradle 8.11.1 distribution.
 
 Distribution staging declares component licenses in its Maven metadata, retaining
 upstream license checks and the original bundled notices.
@@ -96,7 +115,17 @@ Each build prints its fresh `/work/gradle-native/build-*/` directory. `artifacts
 
 ## Source adaptations and identity
 
-`native-platform-android.patch` limits GNU `strerror_r` semantics to glibc. Android Bionic uses the existing POSIX branch. The separate `native-platform-28-sysctl.patch` limits the `sys/sysctl.h` include to its actual Apple caller only for milestone 28; milestone 29 already contains upstream's header correction. Other native code, including file-events' inotify implementation, is unchanged.
+`native-platform-android.patch` limits GNU `strerror_r` semantics to glibc. Android Bionic uses the existing POSIX branch. The separate `native-platform-28-sysctl.patch` limits the `sys/sysctl.h` include to its actual Apple caller only for milestone 28; milestone 29 already contains upstream's header correction.
+
+`file-events-integrated-android.patch` applies only to milestone 26's integrated
+component. Its constructor validates the declared `android-aarch64` target,
+and its native source rejects compilation without Android/Bionic. This replaces
+the old desktop GNU-libc probe, not the watcher: inotify, event handling, lifecycle
+and generated Java/native version checks are unchanged. No GNU libc is impersonated
+and no watcher is disabled. The native-source change requires regenerating the
+file-events fingerprint and rebuilding its paired Java/JNI artifacts together.
+Run the focused source contract with `NATIVE_PLATFORM_SOURCE` pointing to a cached
+upstream Git repository: `python3 test_file_events_android.py` (no network/build).
 
 The native-platform Java companion is explicitly built for Android aarch64. It validates the JVM reports Linux/aarch64 and selects `android-aarch64`, reusing the existing POSIX/Linux kernel implementations. This is build-declared targeting, not a universal Bionic detector, and it never changes `os.name`. `file-events-android.patch` consumes that one identity and maps it to `aarch64-linux-android`. Native resources use exactly those Android names:
 

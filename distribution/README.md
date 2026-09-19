@@ -10,14 +10,15 @@ wrapper, or app/SDK source.
 
 ## Additional exact source targets
 
-`targets.json` also records prepared, **unqualified** source recipes for 8.11.1, 9.3.1,
+`targets.json` also records exact source recipes for 8.11.1, 9.3.1,
 9.4.1, 9.6.0 and 9.7.1. Select an exact target with `GRADLE_VERSION`; 8.14.3
-remains the default. Each uses one shared Gradle 9 file-watching patch plus a
+remains the default. Gradle 9 targets use one shared file-watching patch plus a
 small version-specific dependency/packaging patch. Upstream changes such as
 9.7's probe-file cleanup are retained. The 8.11.1 recipe uses milestone 26's
 original file-events module/API and retains its original watch-logging contract.
-Its native component compilation and host ELF/JNI/fingerprint checks passed;
-Android runtime qualification remains pending. No version is substituted.
+Its corrected native component passed source and Android JNI checks; complete
+8.11.1 distribution qualification remains pending. The 9.6.0.1 candidate's
+focused qualification is recorded below. No version is substituted.
 
 The recipe reads source/bootstrap pins and component versions from the manifest.
 It combines only the declared patch series, validates the cached commit rather
@@ -32,6 +33,21 @@ upstream license generation and ZIP/receipt/component verification in 10m19s
 (151,523,711 bytes); it is not published. Android runtime checks and release
 identity qualification remain pending. That initial candidate used a prerelease
 runtime qualifier and is retained as source-build evidence, not a final release.
+
+### Additional qualified candidate: Gradle 9.6.0.1
+
+On 2026-09-20 the complete source-built 9.6.0.1 candidate passed the focused
+Android client/daemon/worker/F2FS fixture (two builds, 58.285 seconds). Both builds
+used daemon PID 12133; separate workers exercised paired native-platform JNI,
+and default-mode file watching retained unchanged snapshots and detected changed
+inputs. The exact archive is
+`gradle-9.6.0-android-1-20260919181947+0000-bin.zip`, 140,772,538 bytes, SHA-256
+`7d292b904753e09b9f3d840ab1265315aa54709deb3fe9253ee3812e9e41b8e4`.
+Dev evidence: `gradle-native-integration-mxwvv9m0/evidence/result.json` under the
+app-private projects directory; harness log `run-5488394577549155126/output.log`.
+The fixture preserves upstream Gradle 9's NIO metadata/JDK permission services;
+it does not substitute old native-backed metadata behavior. This candidate is
+not yet published; matching AGP/native-build qualification remains separate.
 
 ### Runtime identity and archive identity
 

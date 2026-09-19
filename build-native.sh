@@ -64,6 +64,9 @@ git -C "$stage/native-platform" apply "$repo_dir/native-platform-android.patch"
 if [[ $file_events_layout == standalone ]]; then
     git -C "$fe" apply --check "$repo_dir/file-events-android.patch"
     git -C "$fe" apply "$repo_dir/file-events-android.patch"
+else
+    git -C "$stage/native-platform" apply --check "$repo_dir/file-events-integrated-android.patch"
+    git -C "$stage/native-platform" apply "$repo_dir/file-events-integrated-android.patch"
 fi
 
 run_gradle() {
@@ -174,6 +177,9 @@ printf 'componentProfile=%s\nnativePlatformRevision=%s\nfileEventsRevision=%s\nf
     "$(sha256sum "$repo_dir/native-platform-android.patch" | cut -d ' ' -f 1)" > "$probe/SOURCE-PROVENANCE.properties"
 if [[ $file_events_layout == standalone ]]; then
     printf 'fileEventsPatchSha256=%s\n' "$(sha256sum "$repo_dir/file-events-android.patch" | cut -d ' ' -f 1)" \
+        >> "$probe/SOURCE-PROVENANCE.properties"
+else
+    printf 'fileEventsPatchSha256=%s\n' "$(sha256sum "$repo_dir/file-events-integrated-android.patch" | cut -d ' ' -f 1)" \
         >> "$probe/SOURCE-PROVENANCE.properties"
 fi
 if [[ $apple_sysctl_patch == true ]]; then

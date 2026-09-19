@@ -1,0 +1,73 @@
+diff --git a/file-events/src/main/java/net/rubygrapefruit/platform/internal/jni/LinuxFileEventFunctions.java b/file-events/src/main/java/net/rubygrapefruit/platform/internal/jni/LinuxFileEventFunctions.java
+--- a/file-events/src/main/java/net/rubygrapefruit/platform/internal/jni/LinuxFileEventFunctions.java
++++ b/file-events/src/main/java/net/rubygrapefruit/platform/internal/jni/LinuxFileEventFunctions.java
+@@ -19,6 +19,7 @@
+ import net.rubygrapefruit.platform.NativeIntegrationUnavailableException;
+ import net.rubygrapefruit.platform.file.FileWatchEvent;
+ import net.rubygrapefruit.platform.file.FileWatcher;
++import net.rubygrapefruit.platform.internal.Platform;
+ 
+ import java.io.File;
+ import java.util.ArrayList;
+@@ -41,16 +42,13 @@
+ public class LinuxFileEventFunctions extends AbstractNativeFileEventFunctions<LinuxFileEventFunctions.LinuxFileWatcher> {
+ 
+     public LinuxFileEventFunctions() {
+-        // We have seen some weird behavior on Alpine Linux that uses musl with Gradle that lead to crashes
+-        // As a band-aid we currently don't support file events on Linux with a non-glibc libc.
+-        // See also https://github.com/gradle/gradle/issues/17099
+-        if (!isGlibc0()) {
+-            throw new NativeIntegrationUnavailableException("File events on Linux are only supported with glibc");
++        // Android source port: the companion and JNI library target Bionic explicitly.
++        // Preserve real inotify operation; do not probe for a desktop GNU libc.
++        if (!Platform.current().getId().equals("android-aarch64")) {
++            throw new NativeIntegrationUnavailableException("This file-events component requires Android aarch64");
+         }
+     }
+ 
+-    private static native boolean isGlibc0();
+-
+     @Override
+     public WatcherBuilder newWatcher(BlockingQueue<FileWatchEvent> eventQueue) {
+         return new WatcherBuilder(eventQueue);
+diff --git a/file-events/src/file-events/cpp/linux_fsnotifier.cpp b/file-events/src/file-events/cpp/linux_fsnotifier.cpp
+--- a/file-events/src/file-events/cpp/linux_fsnotifier.cpp
++++ b/file-events/src/file-events/cpp/linux_fsnotifier.cpp
+@@ -1,13 +1,17 @@
+ #ifdef __linux__
+ 
+ #include <codecvt>
+-#include <dlfcn.h>
+ #include <locale>
+ #include <string>
+ #include <sys/ioctl.h>
+ #include <unistd.h>
+ 
+ #include "linux_fsnotifier.h"
+ 
++// Android source port: this component must be compiled for Android Bionic.
++#if !defined(__ANDROID__) || !defined(__BIONIC__)
++#error "The Android file-events component requires Android Bionic"
++#endif
++
+ #define EVENT_BUFFER_SIZE (16 * 1024)
+ 
+@@ -379,18 +383,6 @@
+     }
+ }
+ 
+-JNIEXPORT jboolean JNICALL
+-Java_net_rubygrapefruit_platform_internal_jni_LinuxFileEventFunctions_isGlibc0(JNIEnv*, jclass) {
+-    void* libcLibrary = dlopen("libc.so.6", RTLD_LAZY);
+-    if (!libcLibrary) {
+-        return false;
+-    }
+-    void* libcVerCheck = dlsym(libcLibrary, "gnu_get_libc_version");
+-    jboolean isValid = libcVerCheck != NULL;
+-    dlclose(libcLibrary);
+-    return isValid;
+-}
+-
+ JNIEXPORT void JNICALL
+ Java_net_rubygrapefruit_platform_internal_jni_LinuxFileEventFunctions_00024LinuxFileWatcher_stopWatchingMovedPaths0(JNIEnv* env, jobject, jobject javaServer, jobjectArray jAbsolutePathsToCheck, jobject jDroppedPaths) {
+     try {
