@@ -16,7 +16,8 @@ remains the default. Each uses one shared Gradle 9 file-watching patch plus a
 small version-specific dependency/packaging patch. Upstream changes such as
 9.7's probe-file cleanup are retained. The 8.11.1 recipe uses milestone 26's
 original file-events module/API and retains its original watch-logging contract.
-Its native component compilation remains pending; no version is substituted.
+Its native component compilation and host ELF/JNI/fingerprint checks passed;
+Android runtime qualification remains pending. No version is substituted.
 
 The recipe reads source/bootstrap pins and component versions from the manifest.
 It combines only the declared patch series, validates the cached commit rather
@@ -83,6 +84,9 @@ The restricted local Maven group `app.zyntax.gradle` contains source-built
 `native-platform:0.22-milestone-28-zyntax.1`,
 `gradle-fileevents:0.2.7-zyntax.1`, and `jansi:1.18-zyntax.1`, with sources and
 notices. File-events depends on that exact native-platform and SLF4J 1.7.36.
+Generated component POMs declare their source licenses, including the EPL-1.0
+notices on HawtJNI files bundled in Jansi 1.18. New Gradle license generation reads
+this metadata directly; no upstream license check is disabled or overridden.
 The native-platform artifact basename stays unchanged for Gradle worker lookup.
 Android native resources stay inside their owning component JARs.
 The existing dependency convention declares the original Jansi coordinates replaced

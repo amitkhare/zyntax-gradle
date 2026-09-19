@@ -33,8 +33,12 @@ own exact revisions; Jansi 2.4.2 has a [separate source recipe](jansi/README.md)
 Profile 8.11 preserves milestone 26's integrated file-events component, its
 original package/API and its separate generated native fingerprint. Source
 layout and probe API differences are selected at build time, never by runtime
-fallback. Its recipe is prepared but has not passed compilation/qualification.
+fallback. Both new profiles passed Java/JNI source compilation, generated
+fingerprint checks and host ELF checks; Android runtime qualification is pending.
 No unsupported profile silently uses another one.
+
+Distribution staging declares component licenses in its Maven metadata, retaining
+upstream license checks and the original bundled notices.
 
 `NATIVE_PLATFORM_GRADLE_HOME` and `FILE_EVENTS_GRADLE_HOME` explicitly reuse an
 already installed exact upstream bootstrap without modifying Wrapper caches.

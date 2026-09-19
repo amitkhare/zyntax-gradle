@@ -16,6 +16,8 @@ import zipfile
 from targets import load_target
 
 GROUP = "app.zyntax.gradle"
+APACHE_2 = ("Apache License, Version 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt")
+EPL_1 = ("Eclipse Public License 1.0", "https://www.eclipse.org/legal/epl-v10.html")
 
 
 def verify_source_delta(stage, verification, patch, wrapper_sha256):
@@ -93,6 +95,17 @@ def pom(name, version, dependencies):
     for key, value in (("modelVersion", "4.0.0"), ("groupId", GROUP),
                        ("artifactId", name), ("version", version), ("packaging", "jar")):
         ET.SubElement(root, key).text = value
+    # Declare the licenses of the actual source inputs, not a Gradle packaging
+    # override. Jansi 1 also bundles HawtJNI files carrying EPL-1.0 notices.
+    licenses = [APACHE_2]
+    if name == "jansi" and version == "1.18-zyntax.1":
+        licenses.append(EPL_1)
+    declarations = ET.SubElement(root, "licenses")
+    for license_name, license_url in licenses:
+        item = ET.SubElement(declarations, "license")
+        ET.SubElement(item, "name").text = license_name
+        ET.SubElement(item, "url").text = license_url
+        ET.SubElement(item, "distribution").text = "repo"
     if dependencies:
         items = ET.SubElement(root, "dependencies")
         for group, artifact, dep_version in dependencies:

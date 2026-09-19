@@ -5,8 +5,9 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
-from stage import verify_source_delta
+from stage import APACHE_2, EPL_1, pom, verify_source_delta
 
 
 PATCH = b"""diff --git a/src/Main.java b/src/Main.java
@@ -22,6 +23,26 @@ new file mode 100644
 @@ -0,0 +1 @@
 +class Helper {}
 """
+
+
+class ComponentPomTest(unittest.TestCase):
+    def test_component_licenses_and_dependencies(self):
+        namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+        for name, version, expected in (
+            ("native-platform", "0.22-milestone-29-zyntax.1", [APACHE_2]),
+            ("file-events", "0.22-milestone-26-zyntax.1", [APACHE_2]),
+            ("gradle-fileevents", "0.2.8-zyntax.1", [APACHE_2]),
+            ("jansi", "2.4.2-zyntax.1", [APACHE_2]),
+            ("jansi", "1.18-zyntax.1", [APACHE_2, EPL_1]),
+        ):
+            with self.subTest(name=name, version=version):
+                document = ET.fromstring(pom(name, version, [("test.group", "dependency", "1.0")]))
+                actual = [(item.findtext("m:name", namespaces=namespace),
+                           item.findtext("m:url", namespaces=namespace))
+                          for item in document.findall("m:licenses/m:license", namespace)]
+                self.assertEqual(expected, actual)
+                self.assertEqual("1.0", document.findtext(
+                    "m:dependencies/m:dependency/m:version", namespaces=namespace))
 
 
 class SourceDeltaTest(unittest.TestCase):
