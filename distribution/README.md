@@ -158,6 +158,8 @@ and discards metadata that cannot be trusted. No application paths are hardcoded
 Native component notices, exact source patch, base revision, build inputs and
 component hash manifest accompany the distribution through its source packaging
 specification. The upstream commit identifies the base, not unmodified Gradle.
+Native source-provenance properties are copied unchanged beside their port notice;
+they retain the source and patch hashes from the actual component build.
 The binary ZIP does not contain component source JARs; these are separate release
 companions, with coverage described in [NOTICE.md](../NOTICE.md).
 The reusable [headless qualification fixture](tests/android-native/README.md)

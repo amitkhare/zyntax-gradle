@@ -34,6 +34,13 @@ relicense upstream work or provide a legal-compliance guarantee.
   are in [distribution/targets.json](distribution/targets.json) and the
   [Jansi 2 port notice](jansi/PORT-NOTICE-2.txt). These are not yet qualified
   Gradle distribution releases. Original notices accompany each source build.
+- Native-platform milestone 26 and its integrated file-events component share
+  Apache-2.0 upstream revision `7d95ae055e509163ce7950f1a38c66d342ee77ad`.
+  Their exact build profile is in [distribution/targets.json](distribution/targets.json);
+  the integrated watcher's Android source changes are in
+  [file-events-integrated-android.patch](file-events-integrated-android.patch).
+  Source-generated Java/native fingerprints and the original build's patch
+  hashes remain recorded in its `SOURCE-PROVENANCE.properties`.
 - NDK r29 is an external build input. Its original notices accompany artifacts
   for linked target runtime code. Ncurses and its terminfo database are external
   app-private terminal dependencies, not redistributed in the Gradle bundle.
@@ -43,6 +50,9 @@ relicense upstream work or provide a legal-compliance guarantee.
 
 The binary Gradle ZIP includes component licenses, port notices, source identities,
 the exact Gradle patch and component hashes under `licenses/android-host/`.
+New distribution recipes also preserve the native components' original
+`SOURCE-PROVENANCE.properties` beside their port notice, without rewriting
+older build provenance or already-published release archives.
 It does **not** contain the component source JARs. Keep corresponding sources
 available alongside the [release](https://github.com/amitkhare/zyntax-gradle/releases):
 

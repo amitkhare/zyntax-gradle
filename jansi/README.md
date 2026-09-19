@@ -24,8 +24,8 @@ The first 2.4.2 Android host compilation passed on 2026-09-19 with API 24,
 16 KB LOAD alignment, no RPATH and only Android libc/libm/libdl dependencies.
 Its native SHA-256 is
 `20ab676eaa3d72c3e7e7bb3bf1a542fc02383e7d09b9e854a89708d140f28c78`.
-This is host build evidence only; Android loading/PTY and complete Gradle 9
-distribution qualification are still pending. No Jansi 2 release is published.
+That initial result was host build evidence only; it did not establish Android
+loading or complete Gradle 9 qualification. No Jansi 2 release is published.
 
 The staged source companion now includes the complete build/verifier/probe
 recipe. Final build `build-t3pAZv` passed the same checks: native SHA-256
@@ -33,6 +33,13 @@ recipe. Final build `build-t3pAZv` passed the same checks: native SHA-256
 runtime JAR `5c41a3a8bee03f56b0cbe71eedf4e85af71dafa7ee49f3eb0526f989132c6ee4`,
 sources JAR `791a3ab8a0732f97f7bfb7b2576f5d2a755c7bccc72fbf96dbf284adfabab72b`.
 These are the inputs staged for the new distributions, not an Android test result.
+
+On 2026-09-20 this final JAR passed a fresh-JVM Android Dev check with a real
+80x24 PTY: JNI terminal size, openpty, ioctl, ttyname and termios operations all
+passed. JDK library logging attributed the load to the bundled Android resource
+in the test's isolated temporary directory. Harness evidence:
+`run-8232258351624930627/output.log`. The complete Gradle 9.6.0.1 candidate also
+passed its separate two-build qualification; see [distribution evidence](../distribution/README.md).
 
 ## Build
 

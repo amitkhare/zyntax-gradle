@@ -200,6 +200,7 @@ def main():
     copy_tree(jansi / "licenses", stage / "notices/jansi")
     for source, notice_name in (
         (native / "probe/PORT-NOTICE.txt", "native-components/PORT-NOTICE.txt"),
+        (native / "probe/SOURCE-PROVENANCE.properties", "native-components/SOURCE-PROVENANCE.properties"),
         (native / "ncurses-input.tsv", "native-components/ncurses-input.tsv"),
         (jansi / "PORT-NOTICE.txt", "jansi/PORT-NOTICE.txt"),
         (jansi / "SOURCE-PROVENANCE.properties", "jansi/SOURCE-PROVENANCE.properties"),
