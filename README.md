@@ -204,4 +204,8 @@ On 2026-09-09 the initial core-only USB probe passed in the app-private Android 
 
 ## Notices
 
+The small install-only [bootstrap adapter](launcher/bootstrap/README.md) also
+supports an explicit, confirmed restore of a shared cached distribution. This
+does not change or republish any Gradle distribution or native component.
+
 Both component sources are Apache-2.0. Modified source files carry port notices. Artifacts include their original LICENSE files and the official NDK notices for linked runtime code. The dedicated probe includes SLF4J API 1.7.36 and its [MIT license](https://github.com/qos-ch/slf4j/blob/v_1.7.36/LICENSE.txt); its unconfigured logger can print the standard missing-binding notice. No logging binding is used to mask native failures. Review these component artifacts and device results before any distribution decision.

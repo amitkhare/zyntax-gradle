@@ -64,6 +64,15 @@ that environment. The adapter does not change PATH, preload or routing variables
 
 ## Cache and failure semantics
 
+An explicit `--restore` request invalidates only the selected distribution's
+completion marker under Wrapper's own cache lock. `Install.createDist` then
+performs its normal checksum-verified reinstall and replaces the distribution;
+this adapter does not extract archives or delete installation directories itself.
+The caller must obtain confirmation that local edits will be lost and ensure the
+shared version is not in use. A retained complete archive is reused by Wrapper;
+successful earlier installations normally removed their archive, requiring a new
+download for an explicit restore. Ordinary preparation never forces a restore.
+
 The unmodified upstream installer owns download timeouts, locks, extraction,
 checksum verification and `.ok` markers in the explicit shared Gradle user home.
 The mandatory checksum is verified on installation, not by rehashing a valid

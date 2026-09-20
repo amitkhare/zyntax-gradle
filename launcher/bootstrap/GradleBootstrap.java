@@ -14,16 +14,18 @@ import org.gradle.wrapper.Logger;
 import org.gradle.wrapper.PathAssembler;
 import org.gradle.wrapper.WrapperConfiguration;
 import org.gradle.wrapper.WrapperExecutor;
+import org.gradle.internal.file.locking.ExclusiveFileAccessManager;
 
 /** Installs only. Never loads a project's Wrapper or starts Gradle. */
 public final class GradleBootstrap {
     private GradleBootstrap() {}
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 6 || !args[0].equals("--properties")
+        boolean restore = args.length == 7 && args[6].equals("--restore");
+        if ((args.length != 6 && !restore) || !args[0].equals("--properties")
                 || !args[2].equals("--gradle-user-home") || !args[4].equals("--result")) {
             throw new IllegalArgumentException("Usage: GradleBootstrap --properties <absolute file>"
-                    + " --gradle-user-home <absolute directory> --result <new absolute JSON file>");
+                    + " --gradle-user-home <absolute directory> --result <new absolute JSON file> [--restore]");
         }
         Path propertiesFile = absolute(args[1]);
         Path gradleUserHome = absolute(args[3]);
@@ -56,9 +58,27 @@ public final class GradleBootstrap {
         WrapperConfiguration configuration = WrapperExecutor.forWrapperPropertiesFile(propertiesFile.toFile())
                 .getConfiguration();
         Logger logger = new Logger(false);
+        PathAssembler assembler = new PathAssembler(gradleUserHome.toFile(), propertiesFile.getParent().toFile());
+        if (restore) {
+            // Invalidate only this distribution's completion marker, under the
+            // same lock used by Wrapper. Upstream still owns verified download,
+            // replacing its installation and publishing a new completion marker.
+            var distribution = assembler.getDistribution(configuration);
+            Path archive = distribution.getZipFile().toPath().toAbsolutePath().normalize();
+            Path cache = gradleUserHome.resolve("wrapper/dists");
+            require(archive.startsWith(cache) && !archive.equals(cache), "Distribution is outside the shared Wrapper cache.");
+            if (Files.exists(archive.getParent())) {
+                require(archive.getParent().toRealPath().startsWith(gradleUserHome.toRealPath().resolve("wrapper/dists")),
+                        "Distribution cache resolves outside the selected Gradle home.");
+                new ExclusiveFileAccessManager(120000, 200).access(archive.toFile(), () -> {
+                    Files.deleteIfExists(archive.resolveSibling(archive.getFileName() + ".ok"));
+                    return null;
+                });
+            }
+        }
         Install installer = new Install(logger,
                 new Download(logger, "Zyntax Gradle bootstrap", "1", configuration.getNetworkTimeout()),
-                new PathAssembler(gradleUserHome.toFile(), propertiesFile.getParent().toFile()));
+                assembler);
         // Upstream owns cache keys, locking, SHA verification, extraction and the .ok marker.
         Path installation = installer.createDist(configuration).toPath().toAbsolutePath().normalize();
         String json = "{\"schemaVersion\":1,\"wrapperVersion\":\"8.14.3\",\"gradleHome\":"
