@@ -1,10 +1,23 @@
 # Zyntax Gradle for Android
 
-An optional, Android-aarch64 source port of **Gradle 8.14.3** and its native-platform, file-events and Jansi components. This standalone repository owns only Gradle tooling; it contains no app or extension SDK source and is not a mirror or support promise for all Gradle versions.
+An optional, Android-aarch64 source-port repository for the exact Gradle 8.11.1,
+8.14.3, 9.3.1, 9.4.1, 9.6.0 and 9.7.1 distributions and their
+native-platform, file-events and Jansi components. All six marked distributions
+have passed their source, archive and focused Android native-runtime checks. The
+five new candidates still require their matching APK qualification and
+publication. This standalone repository owns only Gradle tooling; it contains
+no app or extension SDK source and is not a mirror or support promise for other
+Gradle versions.
 
 Stock Gradle already built the Android samples and the complete Zyntax APK/AABs with the separately adapted Android build tools. Its desktop native libraries could not load on Android. This port restores the exercised native process, filesystem and terminal services, plus default file watching and snapshot retention on F2FS; it does not replace Gradle's build engine or claim that stock Gradle cannot build APKs.
 
-The [source-built distribution](distribution/README.md) records the exact verified ZIP, source changes and remaining limits. [Jansi](jansi/README.md) has separate source and probe evidence. Runtime selection is explicit: these recipes do not modify a project's Wrapper, installed Gradle, native extraction cache or JVM OS properties. The release destination is [amitkhare/zyntax-gradle](https://github.com/amitkhare/zyntax-gradle/releases).
+The [source-built distribution](distribution/README.md) records every exact
+verified ZIP, the complete Android distribution passes, source changes and the
+remaining APK and publication gates. [Jansi](jansi/README.md) has separate
+source and probe evidence. Runtime selection is explicit: these recipes do not
+modify a project's Wrapper, installed Gradle, native extraction cache or JVM OS
+properties. The release destination is
+[amitkhare/zyntax-gradle](https://github.com/amitkhare/zyntax-gradle/releases).
 
 The optional [headless launcher](launcher/README.md) uses the official Wrapper to
 download the exact release with SHA-256 verification into standard
@@ -14,18 +27,29 @@ unchanged; complete Android prerequisite setup and Studio integration are separa
 
 ## Repository and release history
 
-The Gradle-only source history was moved out of the former combined toolchain repository. Current recipes live at this repository's root and use an independent Docker volume. The verified 2026-09-09 ZIP was built **before** that move: its embedded provenance and source companions retain their original `gradle/...` recipe paths. Those immutable bytes and hashes are not rewritten to describe the new layout. The relocated recipes have not been rebuilt or device-tested merely by moving them.
+The Gradle-only source history was moved out of the former combined toolchain
+repository. Current recipes live at this repository's root and use an
+independent Docker volume. The verified 2026-09-09 ZIP was built **before** that
+move. Its exact historical identity is
+`gradle-8.14.3-android-1-20260909081124+0000-bin.zip`; its embedded provenance
+and source companions retain their original `gradle/...` recipe paths. Those
+immutable bytes and hashes are not rewritten to describe the new layout. The
+move itself did not trigger a rebuild or device test; later candidates carry
+their own evidence.
 
 See [NOTICE.md](NOTICE.md) for component source and license coverage.
 
-## Additional version ports in progress
+## Qualified source/native-runtime candidates awaiting release
 
 [distribution/targets.json](distribution/targets.json) pins the exact source,
 source-build bootstrap and native dependencies for Gradle 8.11.1, 8.14.3,
 9.3.1, 9.4.1, 9.6.0 and 9.7.1. `targets.py --source <cached-git-repository>`
 audits those immutable source objects without downloading or running Gradle.
-Pins are build inputs, **not additional qualified releases**. The existing
-8.14.3 release remains unchanged while the other ports are built and verified.
+Pins are build inputs, not release availability. All six marked source builds
+and focused Android distribution checks now pass. The existing 8.14.3 release
+remains unchanged; the five additional candidates are unpublished and still
+need their matching AGP/APK qualification. See the
+[distribution record](distribution/README.md) for the complete pass evidence.
 New source recipes use a distinct stable downstream runtime version such as
 `9.6.0.1` (upstream 9.6.0, Android revision 1), with separate Android-branded
 archives and full provenance. This preserves AGP minimum checks and isolates
@@ -39,7 +63,9 @@ Profile 8.11 preserves milestone 26's integrated file-events component, its
 original package/API and its separate generated native fingerprint. Source
 layout and probe API differences are selected at build time, never by runtime
 fallback. Both new profiles passed Java/JNI source compilation, generated
-fingerprint checks and host ELF checks. The first milestone-26 Android probe
+fingerprint checks and host ELF checks. These component probes are supporting
+evidence only; the complete distribution results are in the
+[distribution record](distribution/README.md). The first milestone-26 Android probe
 exposed its integrated watcher's desktop-only glibc gate. Its corrected Android
 source port was rebuilt offline and passed the focused Android probe below.
 No unsupported profile silently uses another one.
@@ -50,7 +76,8 @@ passed an Android Dev probe in a fresh JVM: their actual JNI methods reported
 orderly watcher shutdown. Jansi 2.4.2 also loaded its bundled Android library
 from an isolated extraction directory. Private harness evidence:
 `run-8232258351624930627/output.log`. This qualifies the exercised components,
-not a complete Gradle distribution.
+not a complete Gradle distribution; the full passes are recorded in the
+[distribution record](distribution/README.md).
 
 The corrected milestone-26 component passed the same real Android JNI, curses,
 80x24 PTY and inotify create/remove/shutdown checks on 2026-09-20. Upstream's
@@ -58,8 +85,10 @@ generator produced file-events fingerprint
 `e3f8617e687641b53bbff97e1eed42ea635001df3f164ce77d5000618e57f36f`;
 the native-platform fingerprint is unchanged. Paired probe archive SHA-256:
 `35b5e0b59d28c2ff18910e0472e76eb5d394c8c9042c5e876898f346731841b6`.
-Private harness evidence: `run-3147119755237789211/output.log`. This does not yet
-qualify the complete Gradle 8.11.1 distribution.
+Private harness evidence: `run-3147119755237789211/output.log`. This standalone
+probe did not by itself qualify Gradle 8.11.1; its complete distribution later
+passed the checks recorded in the
+[distribution record](distribution/README.md).
 
 Distribution staging declares component licenses in its Maven metadata, retaining
 upstream license checks and the original bundled notices.
