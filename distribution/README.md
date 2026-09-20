@@ -2,9 +2,11 @@
 
 The existing Gradle 8.14.3 release passed source compilation, archive checks and
 focused Android client/daemon/worker/VFS integration; its immutable evidence is
-below. Current recipes build the exact commits in `targets.json` with upstream's
-`:distributions-full:binDistributionZip` task. The new release-identity contract
-and additional versions are not qualified merely by preparing their recipes.
+below. Gradle 8.11.1.1, 9.3.1.1, 9.4.1.1 and 9.6.0.1 subsequently passed the
+same distribution checks plus their exact AGP/APK rows and are published as
+separate releases. Gradle 9.7.1.1 has passed the distribution checks but still
+awaits its r30 APK row and publication. Current recipes build the exact commits
+in `targets.json` with upstream's `:distributions-full:binDistributionZip` task.
 Nothing here modifies an installed Gradle, its extraction cache, a project's
 wrapper, or app/SDK source.
 
@@ -18,8 +20,8 @@ small version-specific dependency/packaging patch. Upstream changes such as
 original file-events module/API and retains its original watch-logging contract.
 Its corrected native component and complete 8.11.1.1 distribution passed the
 focused Android checks below, as did the 9.3.1.1, 9.4.1.1, 9.6.0.1 and 9.7.1.1 candidates. These
-new versions are not published yet; matching AGP/APK qualification remains
-pending. No version is substituted.
+results do not substitute one version for another. Four candidates also passed
+the exact APK rows and were published as recorded below; 9.7.1.1 remains gated.
 
 The recipe reads source/bootstrap pins and component versions from the manifest.
 It combines only the declared patch series, validates the cached commit rather
@@ -36,7 +38,25 @@ identity qualification were pending for that initial candidate. It used a
 prerelease runtime qualifier and remains historical source-build evidence, not
 a final release. The stable 9.7.1.1 candidate is qualified separately below.
 
-### Additional qualified candidate: Gradle 8.11.1.1
+### APK qualification and publication
+
+The matching APK fixture verifies the actual Gradle daemon/JVM, selected AGP
+fork, and APK manifest, DEX and ARM64 native library. It does not install or run
+the APK and does not claim arbitrary project compatibility. Exact APK sizes,
+hashes, timings and retained receipts are in the
+[AGP qualification record](https://github.com/amitkhare/zyntax-agp/blob/main/docs/verification.md#android-apk-matrix--2026-09-20).
+
+| Gradle runtime | Exact AGP fork | Java | NDK | SDK | APK gate | Release |
+| --- | --- | --- | --- | --- | --- | --- |
+| 8.11.1.1 | 8.7.2-zyntax.1 | 17.0.20 | 27.1.12297006 | 35 | Passed | [8.11.1](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-8.11.1-android-1-20260919193417) |
+| 8.14.3 Android revision 1 | 8.12.3-zyntax.4 | 21.0.12 | 28.2.13676358 | 36 | Passed | [unchanged 8.14.3](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-8.14.3-android-1-20260909081124) |
+| 8.14.3 Android revision 1 | 8.13.0-zyntax.4 | 21.0.12 | 29.0.14206865 | 36 | Passed | same unchanged release |
+| 9.3.1.1 | 9.1.0-zyntax.1 | 21.0.12 | 29.0.14206865 | 36 | Passed | [9.3.1](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.3.1-android-1-20260919193458) |
+| 9.4.1.1 | 9.2.1-zyntax.5 | 21.0.12 | 29.0.14206865 | 36 | Passed | [9.4.1](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.4.1-android-1-20260919193529) |
+| 9.6.0.1 | 9.4.0-zyntax.1 | 21.0.12 | 29.0.14206865 | 36 | Passed | [9.6.0](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.6.0-android-1-20260919181947) |
+| 9.7.1.1 | 9.4.0-zyntax.1 | 21.0.12 | 30.0.16248370 | 36 | Pending | Not published |
+
+### Published Gradle 8.11.1.1
 
 The source build completed 837 tasks in 20m06s using its required cached JDK 11
 and recipe commit `15d368f`. Its exact archive is
@@ -54,10 +74,12 @@ app/core/extension-SDK or bootstrap change occurred.
 
 Private evidence: `gradle-native-integration-ta7xftvs/evidence/result.json` under
 the Dev projects directory; harness `run-4182510064522401491/output.log`.
-Matching AGP/APK qualification and publication remain pending. These checks
-establish the exercised native services, not arbitrary project compatibility.
+Its exact AGP/APK row passed and the unchanged archive plus six companions are
+published in the [Gradle 8.11.1 release](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-8.11.1-android-1-20260919193417).
+All seven remote sizes and SHA-256 digests match. These checks establish the
+exercised native services, not arbitrary project compatibility.
 
-### Additional qualified candidate: Gradle 9.3.1.1
+### Published Gradle 9.3.1.1
 
 The source build completed 868 tasks in 19m37s using the required JDK 17 and
 recipe commit `15d368f`. Its verified archive is
@@ -71,9 +93,11 @@ watching retained unchanged snapshots and invalidated changed inputs. All fixtur
 dependencies were reused from cache; no additional package installation or app
 change was needed. Private evidence: `gradle-native-integration-c7tb79kj/evidence`
 under Dev's projects directory; harness `run-7812940193724266485/output.log`.
-Matching AGP/APK qualification and publication remain pending.
+Its exact AGP/APK row passed and all seven assets in the
+[Gradle 9.3.1 release](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.3.1-android-1-20260919193458)
+match their verified local sizes and SHA-256 digests.
 
-### Additional qualified candidate: Gradle 9.4.1.1
+### Published Gradle 9.4.1.1
 
 The original 6-GiB source-build container reached its aggregate memory limit;
 the preserved attempt has a Docker OOM event, not a source or JVM-heap failure.
@@ -91,9 +115,11 @@ watching retained unchanged snapshots and invalidated changed inputs.
 Private evidence: `gradle-native-integration-plbm9ohd/evidence` under Dev's
 projects directory; harness `run-864678833077280987/output.log`. No extra
 packages, UI navigation, Full-app/project, app/core/SDK or bootstrap change.
-Matching AGP/APK qualification and publication remain pending.
+Its exact AGP/APK row passed and all seven assets in the
+[Gradle 9.4.1 release](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.4.1-android-1-20260919193529)
+match their verified local sizes and SHA-256 digests.
 
-### Additional qualified candidate: Gradle 9.6.0.1
+### Published Gradle 9.6.0.1
 
 On 2026-09-20 the complete source-built 9.6.0.1 candidate passed the focused
 Android client/daemon/worker/F2FS fixture (two builds, 58.285 seconds). Both builds
@@ -106,19 +132,23 @@ Dev evidence: `gradle-native-integration-mxwvv9m0/evidence/result.json` under th
 app-private projects directory; harness log `run-5488394577549155126/output.log`.
 The fixture preserves upstream Gradle 9's NIO metadata/JDK permission services;
 it does not substitute old native-backed metadata behavior. This candidate is
-not yet published; matching AGP/native-build qualification remains separate.
+the preserved Android-native runtime evidence; its matching AGP/APK row also
+passed. Publication uses the notice-corrected archive described below.
 
-The normal distribution task subsequently regenerated its unpublished archive
-to include the native components' original source-provenance properties beside
+The normal distribution task subsequently regenerated the release archive
+before publication to include the native components' original source-provenance properties beside
 their notice. The preserved, Android-tested ZIP was not modified. Comparing both
 archives verified all 699 existing entries byte-for-byte with identical modes;
 the only addition is that provenance file. The corrected candidate is
 140,773,041 bytes, SHA-256
 `6f208ff6debd4b9a36fc8a6b3b2c814edcd1f9e80aa27ad7d1434721f2f8885a`.
 No runtime behavior changed or additional Android run was needed for this
-notice-only packaging correction.
+notice-only packaging correction. The corrected archive and six companions are
+published in the [Gradle 9.6.0 release](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.6.0-android-1-20260919181947);
+all seven remote sizes and SHA-256 digests match. The two archives are not
+byte-identical.
 
-### Additional qualified candidate: Gradle 9.7.1.1
+### Qualified candidate: Gradle 9.7.1.1
 
 The exact source build passed in 9m32s (978 executed tasks), using required
 cached JDK 25, one worker and a 7-GiB container. Recipe commit `15d368f` produced
