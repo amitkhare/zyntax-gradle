@@ -68,3 +68,15 @@ without a download. A sentinel project Wrapper remained unchanged. Java 21.0.12
 reported the exact qualified distribution version. The same invocation completed
 the distribution's Jansi runtime-wrapper check. No build task, APK installation,
 UI navigation or app/SDK change was involved.
+
+On 20 September 2026, the install-only adapter also passed the Android Builder's
+production `gradle-prepare` operation twice using the original qualified 8.11.1
+archive (`0adb8575da81ffb372aec8980e0df91aa4e4d27a31691cdbb4ca1fb5faf2e4e6`)
+through a local URI. The second call returned the same shared installation
+without another download. The following offline collectors observed Gradle
+8.11.1.1/AGP 8.7.2 and retained Gradle 9.7.1.1/AGP 9.4.0 with reusable
+configuration receipts; source and APK hashes/mtime remained unchanged and
+no collector requested a build task. This is headless integration evidence,
+not network-download or UI coverage. The combined row08 log SHA-256 is
+`cc546965fb098c45cd72c70c3080e3b58b4fc6108984ffbc6a3ea2860e1a90ca`;
+see [the scoped AGP evidence](https://github.com/amitkhare/zyntax-agp/blob/main/docs/verification.md#android-apk-matrix--2026-09-20).
