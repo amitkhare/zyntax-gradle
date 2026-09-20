@@ -2,10 +2,9 @@
 
 The existing Gradle 8.14.3 release passed source compilation, archive checks and
 focused Android client/daemon/worker/VFS integration; its immutable evidence is
-below. Gradle 8.11.1.1, 9.3.1.1, 9.4.1.1 and 9.6.0.1 subsequently passed the
+below. Gradle 8.11.1.1, 9.3.1.1, 9.4.1.1, 9.6.0.1 and 9.7.1.1 subsequently passed the
 same distribution checks plus their exact AGP/APK rows and are published as
-separate releases. Gradle 9.7.1.1 has passed the distribution checks but still
-awaits its r30 APK row and publication. Current recipes build the exact commits
+separate releases. Current recipes build the exact commits
 in `targets.json` with upstream's `:distributions-full:binDistributionZip` task.
 Nothing here modifies an installed Gradle, its extraction cache, a project's
 wrapper, or app/SDK source.
@@ -20,8 +19,8 @@ small version-specific dependency/packaging patch. Upstream changes such as
 original file-events module/API and retains its original watch-logging contract.
 Its corrected native component and complete 8.11.1.1 distribution passed the
 focused Android checks below, as did the 9.3.1.1, 9.4.1.1, 9.6.0.1 and 9.7.1.1 candidates. These
-results do not substitute one version for another. Four candidates also passed
-the exact APK rows and were published as recorded below; 9.7.1.1 remains gated.
+results do not substitute one version for another. All five candidates also passed
+the exact APK rows and were published as recorded below.
 
 The recipe reads source/bootstrap pins and component versions from the manifest.
 It combines only the declared patch series, validates the cached commit rather
@@ -54,7 +53,7 @@ hashes, timings and retained receipts are in the
 | 9.3.1.1 | 9.1.0-zyntax.1 | 21.0.12 | 29.0.14206865 | 36 | Passed | [9.3.1](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.3.1-android-1-20260919193458) |
 | 9.4.1.1 | 9.2.1-zyntax.5 | 21.0.12 | 29.0.14206865 | 36 | Passed | [9.4.1](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.4.1-android-1-20260919193529) |
 | 9.6.0.1 | 9.4.0-zyntax.1 | 21.0.12 | 29.0.14206865 | 36 | Passed | [9.6.0](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.6.0-android-1-20260919181947) |
-| 9.7.1.1 | 9.4.0-zyntax.1 | 21.0.12 | 30.0.16248370 | 36 | Pending | Not published |
+| 9.7.1.1 | 9.4.0-zyntax.1 | 21.0.12 | 30.0.16248370 | 36 | Passed | [9.7.1](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.7.1-android-1-20260919193557) |
 
 ### Published Gradle 8.11.1.1
 
@@ -148,7 +147,7 @@ published in the [Gradle 9.6.0 release](https://github.com/amitkhare/zyntax-grad
 all seven remote sizes and SHA-256 digests match. The two archives are not
 byte-identical.
 
-### Qualified candidate: Gradle 9.7.1.1
+### Published Gradle 9.7.1.1
 
 The exact source build passed in 9m32s (978 executed tasks), using required
 cached JDK 25, one worker and a 7-GiB container. Recipe commit `15d368f` produced
@@ -163,8 +162,23 @@ watching retained unchanged snapshots and invalidated changed inputs. Its
 source-build JDK 25 requirement is not an Android runtime requirement.
 Private evidence: `gradle-native-integration-83vnwfkw/evidence` under Dev's
 projects directory; harness `run-3848025695997105904/output.log`.
-No additional packages, UI navigation, Full-app/project, core/SDK or bootstrap
-change. Matching AGP/APK qualification and publication remain pending.
+That native-runtime check involved no additional packages, UI navigation,
+Full-app/project, core/SDK or bootstrap change.
+
+The separate APK row passed with AGP `9.4.0-zyntax.1`, Java 21.0.12, exact NDK
+`30.0.16248370`, compile SDK 36 and build-tools 37.0.0. Genuine CMake 3.22.1 was
+selected from PATH without a project `cmake.dir` or DSL version override.
+The 878,737-byte APK contains its manifest, DEX and ARM64 native library;
+SHA-256 `1962f04e2ecda5b550a94fa7ed7bcae603b8deaca22fa0a1ac2470d7254a2c3d`.
+The retained qualification log SHA-256 is
+`d119fc43a1a86ccbd55d018d18fe8aa0232e517bd544e1aeef9a55c567d03db9`.
+No APK installation or UI navigation was needed.
+
+The original archive and six companion assets are now
+[published](https://github.com/amitkhare/zyntax-gradle/releases/tag/gradle-9.7.1-android-1-20260919193557)
+at exact source target `15d368f1efa56a462974742a95884ee41fa2fa35`. All seven remote
+asset sizes and SHA-256 digests match the retained release inventory. The release
+keeps the existing prerelease policy and does not change GitHub Latest.
 
 ### Runtime identity and archive identity
 

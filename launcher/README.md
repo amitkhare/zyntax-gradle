@@ -40,6 +40,10 @@ this directory unchanged and reuse the shared evaluated project importer.
 
 ## Wrapper provenance
 
+The separate [install-only adapter](bootstrap/README.md) reuses the pinned
+unminified Wrapper internals to return an installation directory without running
+Gradle or evaluating a project. It does not change this launcher's behavior.
+
 `gradlew` and `gradle/wrapper/gradle-wrapper.jar` are the unmodified official Wrapper from
 [Gradle 8.14.3 source](https://github.com/gradle/gradle/tree/e5ee1df3d88b8ca3a8074787a94f373e3090e1db/gradle/wrapper),
 verified against Gradle's [published Wrapper checksum](https://services.gradle.org/distributions/gradle-8.14.3-wrapper.jar.sha256):

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "wrapperVersion": "8.14.3",
+  "upstreamCommit": "e5ee1df3d88b8ca3a8074787a94f373e3090e1db",
+  "distribution": {
+    "url": "https://github.com/amitkhare/zyntax-gradle/releases/download/gradle-8.14.3-android-1-20260909081124/gradle-8.14.3-android-1-20260909081124%2B0000-bin.zip",
+    "size": 137611046,
+    "sha256": "8d36a689a31f571b04af9518e132ee5147f56920dd0d90a5e476e8f9b8abcc87",
+    "root": "gradle-8.14.3-android-1-20260909081124+0000"
+  },
+  "libraries": [
+    {"file": "gradle-wrapper-shared-8.14.3.jar", "size": 31952, "sha256": "3bf4630333dbf3e9dfa18655ec17a267849d1da633df609346d166f2010a134b"},
+    {"file": "gradle-files-8.14.3.jar", "size": 81764, "sha256": "73995ee5b4312208777235c56a5404d9f7b546315be7ff40c086f7be9534beaf"},
+    {"file": "gradle-stdlib-java-extensions-8.14.3.jar", "size": 51370, "sha256": "351cb595314fcdde952758151d258456e98164ec31c28db68d3221b91907707b"},
+    {"file": "failureaccess-1.0.3.jar", "size": 10763, "sha256": "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb"},
+    {"file": "guava-33.4.6-jre.jar", "size": 3024894, "sha256": "958a035b74ff6c7d0cdff9c384524b645eb618f7117b60e1ee915f9cffd0e716"},
+    {"file": "slf4j-api-1.7.36.jar", "size": 41125, "sha256": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0"},
+    {"file": "jsr305-3.0.2.jar", "size": 19936, "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"}
+  ]
+}

@@ -4,9 +4,9 @@ An optional, Android-aarch64 source-port repository for the exact Gradle 8.11.1,
 8.14.3, 9.3.1, 9.4.1, 9.6.0 and 9.7.1 distributions and their
 native-platform, file-events and Jansi components. All six marked distributions
 have passed their source, archive and focused Android native-runtime checks.
-Gradle 8.11.1.1, the existing 8.14.3 Android release, 9.3.1.1, 9.4.1.1 and
-9.6.0.1 are published; each new publication also passed its matching exact
-AGP/APK row. Gradle 9.7.1.1 awaits its AGP 9.4/r30 APK row and publication. This
+Gradle 8.11.1.1, the existing 8.14.3 Android release, 9.3.1.1, 9.4.1.1,
+9.6.0.1 and 9.7.1.1 are published; each new publication also passed its matching
+exact AGP/APK row, including AGP 9.4/r30 for Gradle 9.7.1.1. This
 standalone repository owns only Gradle tooling; it contains no app or extension
 SDK source and is not a mirror or support promise for other Gradle versions.
 
@@ -14,7 +14,7 @@ Stock Gradle already built the Android samples and the complete Zyntax APK/AABs 
 
 The [source-built distribution](distribution/README.md) records every exact
 verified ZIP, the complete Android distribution passes, source changes and the
-published release links plus the remaining 9.7 gate. [Jansi](jansi/README.md) has separate
+published release links. [Jansi](jansi/README.md) has separate
 source and probe evidence. Runtime selection is explicit: these recipes do not
 modify a project's Wrapper, installed Gradle, native extraction cache or JVM OS
 properties. The release destination is
@@ -48,9 +48,8 @@ source-build bootstrap and native dependencies for Gradle 8.11.1, 8.14.3,
 audits those immutable source objects without downloading or running Gradle.
 Pins are build inputs, not release availability. All six marked source builds
 and focused Android distribution checks now pass. The existing 8.14.3 release
-remains unchanged. The 8.11.1.1, 9.3.1.1, 9.4.1.1 and 9.6.0.1 ports passed their
-exact AGP/APK gates and are published with seven verified assets each. The
-9.7.1.1 candidate remains unpublished until its r30 APK row passes. See the
+remains unchanged. The 8.11.1.1, 9.3.1.1, 9.4.1.1, 9.6.0.1 and 9.7.1.1 ports passed
+their exact AGP/APK gates and are published with seven verified assets each. See the
 [distribution record](distribution/README.md) for the exact pairings, release
 links and complete pass evidence.
 New source recipes use a distinct stable downstream runtime version such as
